@@ -5,8 +5,16 @@ const config: CapacitorConfig = {
   appName: 'Structural Master',
   webDir: 'dist/public',
   server: {
-    androidScheme: 'https'
-  }
+    androidScheme: 'https',
+  },
+  plugins: {
+    Filesystem: {
+      requestPermissions: true,
+    },
+    Toast: {
+      duration: 'long',
+    },
+  },
 };
 
 export default config;

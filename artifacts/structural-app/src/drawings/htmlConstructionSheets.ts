@@ -750,15 +750,7 @@ export function openHTMLSheetsForPrint(
     slabs, beams, columns, beamDesigns, colDesigns, slabDesigns, projectName, options,
   );
   
-  const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
-  const blobUrl = URL.createObjectURL(blob);
-  const printWindow = window.open(blobUrl, '_blank');
-  if (printWindow) {
-    printWindow.addEventListener('load', () => {
-      setTimeout(() => {
-        printWindow.print();
-        URL.revokeObjectURL(blobUrl);
-      }, 800);
-    });
-  }
+  import('@/lib/capacitorDownload').then(({ openHTMLForPrint }) =>
+    openHTMLForPrint(htmlContent)
+  );
 }

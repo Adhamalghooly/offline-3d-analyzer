@@ -169,5 +169,7 @@ export function exportStructuralDrawingPDF(
     date: new Date().toLocaleDateString(),
   });
 
-  doc.save(`${projectName}_Drawing_${sheetSize}.pdf`);
+  import('@/lib/capacitorDownload').then(({ downloadJsPDF }) =>
+    downloadJsPDF(doc, `${projectName}_Drawing_${sheetSize}.pdf`)
+  );
 }

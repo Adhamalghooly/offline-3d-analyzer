@@ -317,11 +317,9 @@ const GlobalFrameSolverPanel: React.FC = () => {
 
   // Download diagnostic report
   const downloadReport = useCallback(() => {
-    const blob = new Blob([diagReport.text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'debug_global_system.txt';
-    a.click(); URL.revokeObjectURL(url);
+    import('@/lib/capacitorDownload').then(({ downloadText }) =>
+      downloadText('debug_global_system.txt', diagReport.text)
+    );
   }, [diagReport]);
 
   // Export full report — runs ALL validation tests then assembles 12-section report
@@ -342,13 +340,9 @@ const GlobalFrameSolverPanel: React.FC = () => {
           solverVersion: '1.0.0',
         });
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const blob = new Blob([reportText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `solver_full_report_${timestamp}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
+        import('@/lib/capacitorDownload').then(({ downloadText }) =>
+          downloadText(`solver_full_report_${timestamp}.txt`, reportText)
+        );
         // Also update testResults state so Validation tab reflects fresh run
         setTestResults(freshTests);
       } finally {

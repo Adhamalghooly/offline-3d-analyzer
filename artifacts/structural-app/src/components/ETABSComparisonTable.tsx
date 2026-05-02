@@ -462,11 +462,9 @@ const ETABSComparisonTable: React.FC<Props> = ({
                     });
                     const header = 'الدور,الإطار,الجسر,البحر(م),M2D_يسار,M2D_منتصف,M2D_يمين,M3D_يسار,M3D_منتصف,M3D_يمين,MGF_يسار,MGF_منتصف,MGF_يمين,MUC_يسار,MUC_منتصف,MUC_يمين,ETABS_يسار,ETABS_منتصف,ETABS_يمين';
                     const csv = '\uFEFF' + header + '\n' + rows.join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = 'moments_comparison.csv'; a.click();
-                    URL.revokeObjectURL(url);
+                    import('@/lib/capacitorDownload').then(({ downloadCSV }) =>
+                      downloadCSV('moments_comparison.csv', csv.replace('\uFEFF', ''))
+                    );
                   }}
                 >
                   <Download size={14} />

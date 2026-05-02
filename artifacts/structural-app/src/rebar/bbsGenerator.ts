@@ -385,7 +385,9 @@ export function exportBBSToPDF(entries: BBSEntry[], projectName: string = 'Struc
   } as TitleBlockConfig);
 
   const suffix = storyLabel ? `_BBS_${storyLabel.replace(/\s/g, '_')}` : '_BBS';
-  doc.save(`${projectName}${suffix}.pdf`);
+  import('@/lib/capacitorDownload').then(({ downloadJsPDF }) =>
+    downloadJsPDF(doc, `${projectName}${suffix}.pdf`)
+  );
 }
 
 // =================== BBS EXCEL EXPORT (Enhanced with per-floor sheets) ===================
@@ -449,5 +451,8 @@ export function exportBBSToExcel(
   const wsDia = XLSX.utils.json_to_sheet(diaRows);
   XLSX.utils.book_append_sheet(wb, wsDia, 'By Diameter');
 
-  XLSX.writeFile(wb, `${projectName}_BBS.xlsx`);
+  const xlsxBase64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  import('@/lib/capacitorDownload').then(({ downloadBase64 }) =>
+    downloadBase64(`${projectName}_BBS.xlsx`, xlsxBase64, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  );
 }

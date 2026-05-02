@@ -185,35 +185,17 @@ export default function ProjectManager({
 
   // Backup (download as JSON)
   const handleBackup = (proj: SavedProject) => {
-    const blob = new Blob([JSON.stringify(proj, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${proj.name.replace(/\s+/g, '_')}_backup.json`;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 1000);
+    import('@/lib/capacitorDownload').then(({ downloadText }) =>
+      downloadText(`${proj.name.replace(/\s+/g, '_')}_backup.json`, JSON.stringify(proj, null, 2), 'application/json')
+    );
     showMsg('تم تنزيل النسخة الاحتياطية ✓');
   };
 
   // Backup all projects
   const handleBackupAll = () => {
-    const blob = new Blob([JSON.stringify(projects, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `all_projects_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 1000);
+    import('@/lib/capacitorDownload').then(({ downloadText }) =>
+      downloadText(`all_projects_backup_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(projects, null, 2), 'application/json')
+    );
     showMsg('تم تنزيل نسخة احتياطية لجميع المشاريع ✓');
   };
 

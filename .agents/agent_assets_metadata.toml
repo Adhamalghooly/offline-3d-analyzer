@@ -11,3 +11,9 @@ id = "4HJu-WSjghK7j8VZEqIdS"
 uri = "file://structural-master-apk.zip"
 type = "unspecified"
 title = "Structural Master APK - تطبيق Android"
+
+[[outputs]]
+id = "c_UUC-T7f0KK2zvKgzlDX"
+uri = "file://StructuralMaster_v2.zip"
+type = "unspecified"
+title = "StructuralMaster v2 APK (مُحدَّث)"

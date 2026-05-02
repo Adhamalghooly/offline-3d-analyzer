@@ -7,12 +7,12 @@ interface BottomNavProps {
   onTabChange: (tab: MainTab) => void;
 }
 
-const tabs: { id: MainTab; label: string; icon: typeof FileText }[] = [
-  { id: 'projects', label: 'PROJECTS', icon: FolderOpen },
-  { id: 'inputs', label: 'INPUTS', icon: Settings2 },
-  { id: 'modeling', label: 'MODELING', icon: Compass },
-  { id: 'solver', label: 'SOLVER', icon: Cpu },
-  { id: 'reports', label: 'REPORTS', icon: FileText },
+const tabs: { id: MainTab; labelAr: string; icon: typeof FileText }[] = [
+  { id: 'projects', labelAr: 'المشاريع', icon: FolderOpen },
+  { id: 'inputs',   labelAr: 'المدخلات', icon: Settings2 },
+  { id: 'modeling', labelAr: 'النمذجة',  icon: Compass },
+  { id: 'solver',   labelAr: 'الحلّال',  icon: Cpu },
+  { id: 'reports',  labelAr: 'التقارير', icon: FileText },
 ];
 
 export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
@@ -25,12 +25,13 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`bottom-nav-item ${isActive ? 'active' : ''}`}
+            className={`bottom-nav-item${isActive ? ' active' : ''}`}
           >
-            <span className={isActive ? 'bottom-nav-icon' : ''}>
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+            <span className="bottom-nav-icon-wrap">
+              {isActive && <span className="bottom-nav-pill" />}
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} className="bottom-nav-icon" />
             </span>
-            <span>{tab.label}</span>
+            <span className="bottom-nav-label">{tab.labelAr}</span>
           </button>
         );
       })}

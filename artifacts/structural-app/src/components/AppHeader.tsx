@@ -1,21 +1,36 @@
-import { Compass } from 'lucide-react';
+import { HardHat } from 'lucide-react';
 
 interface AppHeaderProps {
   title?: string;
+  subtitle?: string;
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
 }
 
-export default function AppHeader({ title = 'Structural Master', leftSlot, rightSlot }: AppHeaderProps) {
+export default function AppHeader({
+  title = 'Structural Master',
+  subtitle,
+  leftSlot,
+  rightSlot,
+}: AppHeaderProps) {
   return (
     <header className="app-header">
-      {leftSlot || <div className="w-8 h-8 rounded-lg bg-primary-foreground/20 flex items-center justify-center shrink-0">
-        <Compass size={18} />
-      </div>}
-      <h1 className="app-header-title flex-1 text-center">{title}</h1>
-      {rightSlot || <div className="w-8 h-8 rounded-lg bg-primary-foreground/10 flex items-center justify-center shrink-0">
-        <Compass size={16} />
-      </div>}
+      <div className="app-header-logo">
+        {leftSlot ?? (
+          <div className="app-header-icon">
+            <HardHat size={20} strokeWidth={2} />
+          </div>
+        )}
+      </div>
+
+      <div className="app-header-center">
+        <h1 className="app-header-title">{title}</h1>
+        {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
+      </div>
+
+      <div className="app-header-right">
+        {rightSlot ?? <div className="w-9 h-9" />}
+      </div>
     </header>
   );
 }

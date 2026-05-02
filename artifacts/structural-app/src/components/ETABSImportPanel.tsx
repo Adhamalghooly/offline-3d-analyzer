@@ -184,13 +184,9 @@ function exportToCSV(rows: ComparisonRow[], hasGF: boolean, hasUC: boolean): voi
     if (hasUC) c.push(r.diffUC !== null ? fmtPct(r.diffUC) : '');
     return c.join(',');
   });
-  const blob = new Blob(['\uFEFF' + header + '\n' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'etabs_comparison.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  import('@/lib/capacitorDownload').then(({ downloadCSV }) =>
+    downloadCSV('etabs_comparison.csv', header + '\n' + lines.join('\n'))
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
