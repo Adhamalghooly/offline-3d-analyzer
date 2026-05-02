@@ -262,7 +262,7 @@ export function generateBBS(
 
 // =================== BBS PDF EXPORT (Enhanced with shape sketches) ===================
 
-export function exportBBSToPDF(entries: BBSEntry[], projectName: string = 'Structural Design Studio', storyLabel?: string): void {
+export async function exportBBSToPDF(entries: BBSEntry[], projectName: string = 'Structural Design Studio', storyLabel?: string): Promise<void> {
   const w = 420, h = 297;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [w, h] });
 
@@ -385,7 +385,8 @@ export function exportBBSToPDF(entries: BBSEntry[], projectName: string = 'Struc
   } as TitleBlockConfig);
 
   const suffix = storyLabel ? `_BBS_${storyLabel.replace(/\s/g, '_')}` : '_BBS';
-  doc.save(`${projectName}${suffix}.pdf`);
+  const { savePDF } = await import('@/lib/platformDownload');
+  await savePDF(doc, `${projectName}${suffix}.pdf`);
 }
 
 // =================== BBS EXCEL EXPORT (Enhanced with per-floor sheets) ===================

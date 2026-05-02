@@ -5,6 +5,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { savePDF } from '@/lib/platformDownload';
 import type { Slab, Column, Beam, Frame, MatProps, SlabProps, FrameResult, FlexureResult, ShearResult, ColumnResult, SlabDesignResult, DeflectionResult, Story } from '@/lib/structuralEngine';
 import { calculateDevelopmentLengths } from '@/lib/structuralEngine';
 
@@ -34,7 +35,7 @@ interface SlabDesignData {
   design: SlabDesignResult;
 }
 
-export function generateStructuralReport(
+export async function generateStructuralReport(
   slabs: Slab[],
   beams: Beam[],
   columns: Column[],
@@ -47,7 +48,7 @@ export function generateStructuralReport(
   slabProps: SlabProps,
   projectName: string = 'Structural Design Studio',
   stories: Story[] = [],
-): void {
+): Promise<void> {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
@@ -397,5 +398,5 @@ export function generateStructuralReport(
   addText('  - Column compression lap: max(40db, 300mm) per §25.5.5');
   addText('  - All values rounded up to nearest mm');
 
-  doc.save(`${projectName}_Structural_Report.pdf`);
+  await savePDF(doc, `${projectName}_Structural_Report.pdf`);
 }

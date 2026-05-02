@@ -320,12 +320,7 @@ export function generateReinforcementDXF(slabs: Slab[], beams: Beam[], columns: 
   return `999\nReinforcement DXF\n${dxfHeader()}${dxfTablesMultiStory()}${dxfBlocksSection(columns)}0\nSECTION\n2\nENTITIES\n${entities}0\nENDSEC\n0\nEOF\n`;
 }
 
-export function downloadDXF(content: string, filename: string): void {
-  const blob = new Blob([content], { type: 'application/dxf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+export async function downloadDXF(content: string, filename: string): Promise<void> {
+  const { downloadTextFile } = await import('@/lib/platformDownload');
+  await downloadTextFile(content, filename);
 }

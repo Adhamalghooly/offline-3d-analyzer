@@ -78,13 +78,13 @@ function getAutoScale(
   return 200;
 }
 
-export function exportStructuralDrawingPDF(
+export async function exportStructuralDrawingPDF(
   slabs: Slab[],
   beams: Beam[],
   columns: Column[],
   sheetSize: SheetSize = 'A3',
   projectName: string = 'Structural Design Studio',
-): void {
+): Promise<void> {
   const sheet = SHEET_DIMENSIONS[sheetSize];
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [sheet.w, sheet.h] });
 
@@ -169,5 +169,6 @@ export function exportStructuralDrawingPDF(
     date: new Date().toLocaleDateString(),
   });
 
-  doc.save(`${projectName}_Drawing_${sheetSize}.pdf`);
+  const { savePDF } = await import('@/lib/platformDownload');
+  await savePDF(doc, `${projectName}_Drawing_${sheetSize}.pdf`);
 }

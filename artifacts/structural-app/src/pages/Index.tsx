@@ -36,6 +36,7 @@ import {
   Grid3X3, Settings2, Download, Bot, Building, Zap, Plus, Trash2,
   Undo2, Save, Check, Wand2, Search, Compass, Merge, Crosshair, CheckSquare, Upload, Activity, FileText
 } from "lucide-react";
+import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import BottomNav, { type MainTab } from "@/components/BottomNav";
 import AIAssistantPanel from "@/ai/structuralAssistant/AIAssistantPanel";
@@ -200,6 +201,7 @@ const Index = () => {
       const t = setTimeout(() => dispatch({ type: 'CLEAR_SAVED_MESSAGE' }), 2000);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [savedMessage]);
 
   // Keyboard shortcut: Ctrl+Z for undo
@@ -2476,18 +2478,22 @@ const Index = () => {
                   size="sm"
                   variant="outline"
                   disabled={!analyzed}
-                  onClick={() => {
-                    const engines: EngineRawStations[] = [];
-                    if (frameResults2D.length)    engines.push({ engine: '2D',  data: extractRawStations(frameResults2D,    beamsWithLoads) });
-                    if (frameResults3DRaw.length) engines.push({ engine: '3D',  data: extractRawStations(frameResults3DRaw, beamsWithLoads) });
-                    if (frameResultsGF.length)    engines.push({ engine: 'GF',  data: extractRawStations(frameResultsGF,    beamsWithLoads) });
-                    if (frameResultsUC.length)    engines.push({ engine: 'UC',  data: extractRawStations(frameResultsUC,    beamsWithLoads) });
-                    if (selectedEngine === 'fem_coupled' && frameResults.length) {
-                      engines.push({ engine: 'FEM', data: extractRawStations(frameResults, beamsWithLoads) });
-                    }
-                    const csv = buildRawStationsCSV(engines);
-                    const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    downloadCSV(`raw_moment_stations_${ts}.csv`, csv);
+                  onClick={async () => {
+                    try {
+                      const engines: EngineRawStations[] = [];
+                      if (frameResults2D.length)    engines.push({ engine: '2D',  data: extractRawStations(frameResults2D,    beamsWithLoads) });
+                      if (frameResults3DRaw.length) engines.push({ engine: '3D',  data: extractRawStations(frameResults3DRaw, beamsWithLoads) });
+                      if (frameResultsGF.length)    engines.push({ engine: 'GF',  data: extractRawStations(frameResultsGF,    beamsWithLoads) });
+                      if (frameResultsUC.length)    engines.push({ engine: 'UC',  data: extractRawStations(frameResultsUC,    beamsWithLoads) });
+                      if (selectedEngine === 'fem_coupled' && frameResults.length) {
+                        engines.push({ engine: 'FEM', data: extractRawStations(frameResults, beamsWithLoads) });
+                      }
+                      if (engines.length === 0) { toast.warning('لا توجد نتائج محركات للتصدير'); return; }
+                      const csv = buildRawStationsCSV(engines);
+                      const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                      await downloadCSV(`raw_moment_stations_${ts}.csv`, csv);
+                      toast.success('تم تحميل ملف CSV بنجاح', { description: `عزوم ${engines.length} محرك — تحقق من مجلد التنزيلات` });
+                    } catch(e: any) { toast.error('فشل التصدير', { description: e?.message }); }
                   }}
                   className="w-full min-h-[40px]"
                 >
@@ -3624,15 +3630,28 @@ const Index = () => {
                   <div className="export-card-header">
                     <FileText size={16} className="text-primary" />
                     <span className="export-card-title">تقرير التصميم PDF</span>
-                    {analyzed && <span className="mr-auto text-[11px] text-green-600 font-medium flex items-center gap-1"><Check size={12}/>جاهز</span>}
+                    {analyzed && <span className="mr-auto text-[11px] text-green-600 font-medium flex items-center gap-1"><Check size={12}/>جاهز للتصدير</span>}
                   </div>
                   <div className="export-card-body">
                     <button
                       className="action-btn action-btn-primary"
                       disabled={!analyzed}
-                      onClick={() => {
-                        const slabDesignsData = slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }));
-                        generateStructuralReport(slabs, beamsWithLoads, columns, frames, frameResults, beamDesigns as any, colDesigns, slabDesignsData, mat, slabProps, 'Structural Design Studio', stories);
+                      onClick={async () => {
+                        const tid = toast.loading('جاري إنشاء تقرير PDF...');
+                        try {
+                          if (beamDesigns.length === 0) {
+                            toast.dismiss(tid);
+                            toast.warning('لا توجد نتائج تصميم', { description: 'شغّل التحليل أولاً للحصول على نتائج التصميم' });
+                            return;
+                          }
+                          const slabDesignsData = slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }));
+                          await generateStructuralReport(slabs, beamsWithLoads, columns, frames, frameResults, beamDesigns as any, colDesigns, slabDesignsData, mat, slabProps, 'Structural Design Studio', stories);
+                          toast.dismiss(tid);
+                          toast.success('تم تحميل التقرير بنجاح', { description: 'تحقق من مجلد التنزيلات في جهازك' });
+                        } catch (e: any) {
+                          toast.dismiss(tid);
+                          toast.error('فشل إنشاء التقرير', { description: e?.message || 'حدث خطأ غير متوقع' });
+                        }
                       }}
                     >
                       <Download size={16} />
@@ -3646,36 +3665,62 @@ const Index = () => {
                   <div className="export-card-header">
                     <Download size={16} className="text-primary" />
                     <span className="export-card-title">مخططات DXF (AutoCAD)</span>
+                    <span className="mr-auto text-[11px] text-blue-600 font-medium">لا تحتاج تحليل</span>
                   </div>
                   <div className="export-card-body">
+                    {slabs.length === 0 && beamsWithLoads.length === 0 && (
+                      <p className="text-[11px] text-amber-600 bg-amber-50 rounded p-2 mb-2">⚠️ أضف بلاطات وجسور أولاً قبل التصدير</p>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         className="action-btn action-btn-outline"
-                        onClick={() => downloadDXF(generateStructuralDXF(slabs, beamsWithLoads, columns), 'structural_plan.dxf')}
+                        onClick={async () => {
+                          try {
+                            if (slabs.length === 0 && beamsWithLoads.length === 0) { toast.warning('لا توجد عناصر للتصدير'); return; }
+                            await downloadDXF(generateStructuralDXF(slabs, beamsWithLoads, columns), 'structural_plan.dxf');
+                            toast.success('تم تحميل structural_plan.dxf', { description: 'افتحه في AutoCAD أو برامج DXF' });
+                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
+                        }}
                       >
                         <Download size={14} />مخطط إنشائي
                       </button>
                       <button
                         className="action-btn action-btn-outline"
-                        onClick={() => downloadDXF(generateBeamLayoutDXF(beamsWithLoads, columns, slabs), 'beam_layout.dxf')}
+                        onClick={async () => {
+                          try {
+                            if (beamsWithLoads.length === 0) { toast.warning('لا توجد جسور للتصدير'); return; }
+                            await downloadDXF(generateBeamLayoutDXF(beamsWithLoads, columns, slabs), 'beam_layout.dxf');
+                            toast.success('تم تحميل beam_layout.dxf');
+                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
+                        }}
                       >
                         <Download size={14} />مخطط الجسور
                       </button>
                       <button
                         className="action-btn action-btn-outline"
-                        onClick={() => downloadDXF(generateColumnLayoutDXF(columns, slabs), 'column_layout.dxf')}
+                        onClick={async () => {
+                          try {
+                            if (columns.length === 0) { toast.warning('لا توجد أعمدة للتصدير'); return; }
+                            await downloadDXF(generateColumnLayoutDXF(columns, slabs), 'column_layout.dxf');
+                            toast.success('تم تحميل column_layout.dxf');
+                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
+                        }}
                       >
                         <Download size={14} />مخطط الأعمدة
                       </button>
                       <button
                         className="action-btn action-btn-outline"
                         disabled={!analyzed}
-                        onClick={() => {
-                          const rebarData = beamDesigns.map(d => {
-                            const beam = beamsWithLoads.find(b => b.id === d.beamId);
-                            return beam ? { beamId: d.beamId, b: beam.b, h: beam.h, x1: beam.x1, y1: beam.y1, x2: beam.x2, y2: beam.y2, topBars: Math.max(d.flexLeft.bars, d.flexRight.bars), topDia: d.flexLeft.dia, botBars: d.flexMid.bars, botDia: d.flexMid.dia, stirrups: d.shear.stirrups } : null;
-                          }).filter(Boolean) as any[];
-                          downloadDXF(generateReinforcementDXF(slabs, beamsWithLoads, columns, rebarData), 'reinforcement.dxf');
+                        onClick={async () => {
+                          try {
+                            if (beamDesigns.length === 0) { toast.warning('شغّل التحليل أولاً'); return; }
+                            const rebarData = beamDesigns.map(d => {
+                              const beam = beamsWithLoads.find(b => b.id === d.beamId);
+                              return beam ? { beamId: d.beamId, b: beam.b, h: beam.h, x1: beam.x1, y1: beam.y1, x2: beam.x2, y2: beam.y2, topBars: Math.max(d.flexLeft.bars, d.flexRight.bars), topDia: d.flexLeft.dia, botBars: d.flexMid.bars, botDia: d.flexMid.dia, stirrups: d.shear.stirrups } : null;
+                            }).filter(Boolean) as any[];
+                            await downloadDXF(generateReinforcementDXF(slabs, beamsWithLoads, columns, rebarData), 'reinforcement.dxf');
+                            toast.success('تم تحميل reinforcement.dxf');
+                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
                         }}
                       >
                         <Download size={14} />مخطط التسليح
