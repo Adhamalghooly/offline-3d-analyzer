@@ -59,8 +59,26 @@ export default function MultiStoryDesigner({
   const [optimizationResult, setOptimizationResult] = useState<OptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
+  const [floorOverrides, setFloorOverrides] = useState<Record<string, Partial<FloorConfig>>>({});
 
-  const building = useMemo(() => generateBuildingModel(config), [config]);
+  const updateFloorOverride = useCallback((floorId: string, key: keyof FloorConfig, value: number) => {
+    setFloorOverrides(prev => ({
+      ...prev,
+      [floorId]: { ...prev[floorId], [key]: value },
+    }));
+    setOptimizationResult(null);
+  }, []);
+
+  const building = useMemo(() => {
+    const base = generateBuildingModel(config);
+    if (Object.keys(floorOverrides).length === 0) return base;
+    return {
+      ...base,
+      floors: base.floors.map(f =>
+        floorOverrides[f.id] ? { ...f, ...floorOverrides[f.id] } : f
+      ),
+    };
+  }, [config, floorOverrides]);
   const floorLoads = useMemo(() => calculateFloorLoads(building), [building]);
   const accumulatedLoads = useMemo(() => calculateAccumulatedColumnLoads(building), [building]);
 
@@ -353,18 +371,15 @@ export default function MultiStoryDesigner({
                     {floor.type !== 'grade_beam' && (
                       <>
                         <ParamInput label="الحمل الحي" value={floor.liveLoad}
-                          onChange={v => {
-                            const updated = updateFloor(building, floor.id, { liveLoad: v });
-                            // Re-derive config isn't straightforward; we update directly
-                          }} unit="kN/m²" />
+                          onChange={v => updateFloorOverride(floor.id, 'liveLoad', v)} unit="kN/m²" />
                         <ParamInput label="حمل الجدران" value={floor.wallLoad}
-                          onChange={v => {}} unit="kN/m" />
+                          onChange={v => updateFloorOverride(floor.id, 'wallLoad', v)} unit="kN/m" />
                         <ParamInput label="التشطيبات" value={floor.finishLoad}
-                          onChange={v => {}} unit="kN/m²" />
+                          onChange={v => updateFloorOverride(floor.id, 'finishLoad', v)} unit="kN/m²" />
                       </>
                     )}
                     <ParamInput label="ارتفاع الجسر" value={floor.beamH}
-                      onChange={v => {}} unit="mm" />
+                      onChange={v => updateFloorOverride(floor.id, 'beamH', v)} unit="mm" />
                   </CardContent>
                 </Card>
               );
