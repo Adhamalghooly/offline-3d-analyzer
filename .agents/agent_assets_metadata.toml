@@ -1,8 +1,13 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "WcLWpRlupvN5kolqqp70H"
 uri = "file://artifacts/structural-mobile/assets/images/icon.png"
 type = "image"
 title = "generated_image"
+
+[[outputs]]
+id = "4HJu-WSjghK7j8VZEqIdS"
+uri = "file://structural-master-apk.zip"
+type = "unspecified"
+title = "Structural Master APK - تطبيق Android"
