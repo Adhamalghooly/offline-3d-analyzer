@@ -150,10 +150,17 @@ export function buildRawStationsCSV(engines: EngineRawStations[]): string {
 }
 
 /**
- * Trigger a platform-aware download for the given CSV content.
- * Works in both the browser and native Android/iOS (Capacitor).
+ * Trigger a browser download for the given CSV content.
  */
-export async function downloadCSV(filename: string, content: string): Promise<void> {
-  const { downloadCSVFile } = await import('@/lib/platformDownload');
-  await downloadCSVFile(content, filename);
+export function downloadCSV(filename: string, content: string): void {
+  // Add UTF-8 BOM so Excel opens Arabic characters correctly.
+  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

@@ -34,9 +34,8 @@ import AnalysisDiagramDialog from "@/components/AnalysisDiagramDialog";
 import {
   Building2, Layers, Calculator, BarChart3, Ruler, Eye,
   Grid3X3, Settings2, Download, Bot, Building, Zap, Plus, Trash2,
-  Undo2, Save, Check, Wand2, Search, Compass, Merge, Crosshair, CheckSquare, Upload, Activity, FileText
+  Undo2, Save, Check, Wand2, Search, Compass, Merge, Crosshair, CheckSquare, Upload, Activity
 } from "lucide-react";
-import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import BottomNav, { type MainTab } from "@/components/BottomNav";
 import AIAssistantPanel from "@/ai/structuralAssistant/AIAssistantPanel";
@@ -134,7 +133,7 @@ const Index = () => {
   );
 
   // Main bottom navigation tab
-  const [mainTab, setMainTab] = React.useState<MainTab>('projects');
+  const [mainTab, setMainTab] = React.useState<MainTab>('inputs');
   const [releaseEditorBeamId, setReleaseEditorBeamId] = React.useState<string | null>(null);
   const [releaseEditorData, setReleaseEditorData] = React.useState<BeamEndReleaseState>(createEmptyBeamEndReleases);
 
@@ -201,7 +200,6 @@ const Index = () => {
       const t = setTimeout(() => dispatch({ type: 'CLEAR_SAVED_MESSAGE' }), 2000);
       return () => clearTimeout(t);
     }
-    return undefined;
   }, [savedMessage]);
 
   // Keyboard shortcut: Ctrl+Z for undo
@@ -1500,16 +1498,21 @@ const Index = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <AppHeader
+      <AppHeader 
         title="Structural Master"
+        leftSlot={
+          <div className="w-9 h-9 rounded-xl bg-primary-foreground/20 flex items-center justify-center shrink-0">
+            <Building2 size={18} />
+          </div>
+        }
         rightSlot={
-          <div className="flex items-center gap-1">
-            <button className="app-header-icon-btn">
-              <Search size={17} />
+          <div className="flex items-center gap-2">
+            <button className="w-8 h-8 rounded-lg bg-primary-foreground/10 flex items-center justify-center">
+              <Search size={16} />
             </button>
-            <button className="app-header-icon-btn">
-              <Building2 size={17} />
-            </button>
+            <div className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xs font-bold">
+              <Compass size={16} />
+            </div>
           </div>
         }
       />
@@ -1517,49 +1520,28 @@ const Index = () => {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={tab => dispatch({ type: 'SET_ACTIVE_TAB', tab })} className="h-full flex flex-col">
-
-          {/* Sub-tabs */}
+          
+          {/* Sub-tabs within each main section */}
           {mainTab === 'reports' && (
-            <div className="sub-tabs-bar">
-              {[
-                { value: 'design', label: 'التصميم', icon: <Ruler size={15} /> },
-                { value: 'results', label: 'النتائج', icon: <BarChart3 size={15} /> },
-                { value: 'export', label: 'التصدير', icon: <Download size={15} /> },
-              ].map(t => (
-                <button key={t.value} className={`sub-tab-btn${activeTab === t.value ? ' active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', tab: t.value })}>
-                  {t.icon}{t.label}
-                </button>
-              ))}
-            </div>
+            <TabsList className="w-full justify-start rounded-none border-b border-border bg-card px-2 overflow-x-auto shrink-0 h-auto">
+              <TabsTrigger value="design" className="text-xs gap-1 min-h-[40px]"><Ruler size={14} />التصميم</TabsTrigger>
+              <TabsTrigger value="results" className="text-xs gap-1 min-h-[40px]"><BarChart3 size={14} />النتائج</TabsTrigger>
+              <TabsTrigger value="export" className="text-xs gap-1 min-h-[40px]"><Download size={14} />التصدير</TabsTrigger>
+            </TabsList>
           )}
           {mainTab === 'inputs' && (
-            <div className="sub-tabs-bar">
-              {[
-                { value: 'input', label: 'المدخلات', icon: <Settings2 size={15} /> },
-                { value: 'slabs', label: 'البلاطات', icon: <Layers size={15} /> },
-                { value: 'building', label: 'مبنى متعدد', icon: <Building size={15} /> },
-              ].map(t => (
-                <button key={t.value} className={`sub-tab-btn${activeTab === t.value ? ' active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', tab: t.value })}>
-                  {t.icon}{t.label}
-                </button>
-              ))}
-            </div>
+            <TabsList className="w-full justify-start rounded-none border-b border-border bg-card px-2 overflow-x-auto shrink-0 h-auto">
+              <TabsTrigger value="input" className="text-xs gap-1 min-h-[40px]"><Settings2 size={14} />المدخلات</TabsTrigger>
+              <TabsTrigger value="slabs" className="text-xs gap-1 min-h-[40px]"><Layers size={14} />الإدخال</TabsTrigger>
+              <TabsTrigger value="building" className="text-xs gap-1 min-h-[40px]"><Building size={14} />مبنى متعدد</TabsTrigger>
+            </TabsList>
           )}
           {mainTab === 'modeling' && (
-            <div className="sub-tabs-bar">
-              {[
-                { value: 'modeler', label: 'النمذجة', icon: <Grid3X3 size={15} /> },
-                { value: 'view', label: 'العرض', icon: <Eye size={15} /> },
-                { value: 'analysis', label: 'التحليل', icon: <Calculator size={15} /> },
-              ].map(t => (
-                <button key={t.value} className={`sub-tab-btn${activeTab === t.value ? ' active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', tab: t.value })}>
-                  {t.icon}{t.label}
-                </button>
-              ))}
-            </div>
+            <TabsList className="w-full justify-start rounded-none border-b border-border bg-card px-2 overflow-x-auto shrink-0 h-auto">
+              <TabsTrigger value="modeler" className="text-xs gap-1 min-h-[40px]"><Grid3X3 size={14} />النمذجة</TabsTrigger>
+              <TabsTrigger value="view" className="text-xs gap-1 min-h-[40px]"><Eye size={14} />العرض</TabsTrigger>
+              <TabsTrigger value="analysis" className="text-xs gap-1 min-h-[40px]"><Calculator size={14} />التحليل</TabsTrigger>
+            </TabsList>
           )}
 
           {/* MODELER TAB */}
@@ -2478,22 +2460,18 @@ const Index = () => {
                   size="sm"
                   variant="outline"
                   disabled={!analyzed}
-                  onClick={async () => {
-                    try {
-                      const engines: EngineRawStations[] = [];
-                      if (frameResults2D.length)    engines.push({ engine: '2D',  data: extractRawStations(frameResults2D,    beamsWithLoads) });
-                      if (frameResults3DRaw.length) engines.push({ engine: '3D',  data: extractRawStations(frameResults3DRaw, beamsWithLoads) });
-                      if (frameResultsGF.length)    engines.push({ engine: 'GF',  data: extractRawStations(frameResultsGF,    beamsWithLoads) });
-                      if (frameResultsUC.length)    engines.push({ engine: 'UC',  data: extractRawStations(frameResultsUC,    beamsWithLoads) });
-                      if (selectedEngine === 'fem_coupled' && frameResults.length) {
-                        engines.push({ engine: 'FEM', data: extractRawStations(frameResults, beamsWithLoads) });
-                      }
-                      if (engines.length === 0) { toast.warning('لا توجد نتائج محركات للتصدير'); return; }
-                      const csv = buildRawStationsCSV(engines);
-                      const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                      await downloadCSV(`raw_moment_stations_${ts}.csv`, csv);
-                      toast.success('تم تحميل ملف CSV بنجاح', { description: `عزوم ${engines.length} محرك — تحقق من مجلد التنزيلات` });
-                    } catch(e: any) { toast.error('فشل التصدير', { description: e?.message }); }
+                  onClick={() => {
+                    const engines: EngineRawStations[] = [];
+                    if (frameResults2D.length)    engines.push({ engine: '2D',  data: extractRawStations(frameResults2D,    beamsWithLoads) });
+                    if (frameResults3DRaw.length) engines.push({ engine: '3D',  data: extractRawStations(frameResults3DRaw, beamsWithLoads) });
+                    if (frameResultsGF.length)    engines.push({ engine: 'GF',  data: extractRawStations(frameResultsGF,    beamsWithLoads) });
+                    if (frameResultsUC.length)    engines.push({ engine: 'UC',  data: extractRawStations(frameResultsUC,    beamsWithLoads) });
+                    if (selectedEngine === 'fem_coupled' && frameResults.length) {
+                      engines.push({ engine: 'FEM', data: extractRawStations(frameResults, beamsWithLoads) });
+                    }
+                    const csv = buildRawStationsCSV(engines);
+                    const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                    downloadCSV(`raw_moment_stations_${ts}.csv`, csv);
                   }}
                   className="w-full min-h-[40px]"
                 >
@@ -3611,157 +3589,68 @@ const Index = () => {
           </TabsContent>
 
           {/* EXPORT TAB */}
-          <TabsContent value="export" className="flex-1 overflow-auto mt-0">
-            <div className="p-3 space-y-4 max-w-4xl mx-auto">
+          <TabsContent value="export" className="flex-1 overflow-auto p-4">
+            <div className="max-w-5xl space-y-6">
+              {/* BOQ - Bill of Quantities */}
+              <BOQPanel
+                stories={stories}
+                slabs={slabs}
+                beams={beamsWithLoads}
+                columns={columns}
+                beamDesigns={beamDesigns as any}
+                colDesigns={colDesigns}
+                slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) })) as any}
+                slabProps={slabProps}
+                analyzed={analyzed}
+              />
+              {/* Main Export Panel with Floor Selector */}
+              <ExportPanel
+                stories={stories}
+                slabs={slabs}
+                beams={beamsWithLoads}
+                columns={columns}
+                beamDesigns={beamDesigns as any}
+                colDesigns={colDesigns}
+                slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }))}
+                mat={mat}
+                slabProps={slabProps}
+                projectName="Structural Design Studio"
+                analyzed={analyzed}
+              />
 
-              {/* Analysis required notice */}
-              {!analyzed && (
-                <div className="analysis-required-banner">
-                  <Activity size={16} className="shrink-0" />
-                  <span>يجب تشغيل التحليل الإنشائي أولاً لتفعيل تصدير التقارير والتسليح. اذهب إلى <strong>النمذجة &rarr; التحليل</strong> وشغّل التحليل.</span>
-                </div>
-              )}
+              {/* Additional quick export buttons */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">تقرير PDF</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button className="w-full min-h-[44px]" disabled={!analyzed} onClick={() => {
+                      const slabDesignsData = slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }));
+                      generateStructuralReport(slabs, beamsWithLoads, columns, frames, frameResults, beamDesigns as any, colDesigns, slabDesignsData, mat, slabProps, 'Structural Design Studio', stories);
+                    }}>تقرير التصميم الإنشائي</Button>
+                  </CardContent>
+                </Card>
 
-              {/* Quick Export Cards */}
-              <div className="grid grid-cols-1 gap-3">
-
-                {/* PDF Report */}
-                <div className="export-card">
-                  <div className="export-card-header">
-                    <FileText size={16} className="text-primary" />
-                    <span className="export-card-title">تقرير التصميم PDF</span>
-                    {analyzed && <span className="mr-auto text-[11px] text-green-600 font-medium flex items-center gap-1"><Check size={12}/>جاهز للتصدير</span>}
-                  </div>
-                  <div className="export-card-body">
-                    <button
-                      className="action-btn action-btn-primary"
-                      disabled={!analyzed}
-                      onClick={async () => {
-                        const tid = toast.loading('جاري إنشاء تقرير PDF...');
-                        try {
-                          if (beamDesigns.length === 0) {
-                            toast.dismiss(tid);
-                            toast.warning('لا توجد نتائج تصميم', { description: 'شغّل التحليل أولاً للحصول على نتائج التصميم' });
-                            return;
-                          }
-                          const slabDesignsData = slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }));
-                          await generateStructuralReport(slabs, beamsWithLoads, columns, frames, frameResults, beamDesigns as any, colDesigns, slabDesignsData, mat, slabProps, 'Structural Design Studio', stories);
-                          toast.dismiss(tid);
-                          toast.success('تم تحميل التقرير بنجاح', { description: 'تحقق من مجلد التنزيلات في جهازك' });
-                        } catch (e: any) {
-                          toast.dismiss(tid);
-                          toast.error('فشل إنشاء التقرير', { description: e?.message || 'حدث خطأ غير متوقع' });
-                        }
-                      }}
-                    >
-                      <Download size={16} />
-                      تحميل تقرير التصميم الإنشائي
-                    </button>
-                  </div>
-                </div>
-
-                {/* DXF Drawings */}
-                <div className="export-card">
-                  <div className="export-card-header">
-                    <Download size={16} className="text-primary" />
-                    <span className="export-card-title">مخططات DXF (AutoCAD)</span>
-                    <span className="mr-auto text-[11px] text-blue-600 font-medium">لا تحتاج تحليل</span>
-                  </div>
-                  <div className="export-card-body">
-                    {slabs.length === 0 && beamsWithLoads.length === 0 && (
-                      <p className="text-[11px] text-amber-600 bg-amber-50 rounded p-2 mb-2">⚠️ أضف بلاطات وجسور أولاً قبل التصدير</p>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        className="action-btn action-btn-outline"
-                        onClick={async () => {
-                          try {
-                            if (slabs.length === 0 && beamsWithLoads.length === 0) { toast.warning('لا توجد عناصر للتصدير'); return; }
-                            await downloadDXF(generateStructuralDXF(slabs, beamsWithLoads, columns), 'structural_plan.dxf');
-                            toast.success('تم تحميل structural_plan.dxf', { description: 'افتحه في AutoCAD أو برامج DXF' });
-                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
-                        }}
-                      >
-                        <Download size={14} />مخطط إنشائي
-                      </button>
-                      <button
-                        className="action-btn action-btn-outline"
-                        onClick={async () => {
-                          try {
-                            if (beamsWithLoads.length === 0) { toast.warning('لا توجد جسور للتصدير'); return; }
-                            await downloadDXF(generateBeamLayoutDXF(beamsWithLoads, columns, slabs), 'beam_layout.dxf');
-                            toast.success('تم تحميل beam_layout.dxf');
-                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
-                        }}
-                      >
-                        <Download size={14} />مخطط الجسور
-                      </button>
-                      <button
-                        className="action-btn action-btn-outline"
-                        onClick={async () => {
-                          try {
-                            if (columns.length === 0) { toast.warning('لا توجد أعمدة للتصدير'); return; }
-                            await downloadDXF(generateColumnLayoutDXF(columns, slabs), 'column_layout.dxf');
-                            toast.success('تم تحميل column_layout.dxf');
-                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
-                        }}
-                      >
-                        <Download size={14} />مخطط الأعمدة
-                      </button>
-                      <button
-                        className="action-btn action-btn-outline"
-                        disabled={!analyzed}
-                        onClick={async () => {
-                          try {
-                            if (beamDesigns.length === 0) { toast.warning('شغّل التحليل أولاً'); return; }
-                            const rebarData = beamDesigns.map(d => {
-                              const beam = beamsWithLoads.find(b => b.id === d.beamId);
-                              return beam ? { beamId: d.beamId, b: beam.b, h: beam.h, x1: beam.x1, y1: beam.y1, x2: beam.x2, y2: beam.y2, topBars: Math.max(d.flexLeft.bars, d.flexRight.bars), topDia: d.flexLeft.dia, botBars: d.flexMid.bars, botDia: d.flexMid.dia, stirrups: d.shear.stirrups } : null;
-                            }).filter(Boolean) as any[];
-                            await downloadDXF(generateReinforcementDXF(slabs, beamsWithLoads, columns, rebarData), 'reinforcement.dxf');
-                            toast.success('تم تحميل reinforcement.dxf');
-                          } catch(e: any) { toast.error('فشل تصدير DXF', { description: e?.message }); }
-                        }}
-                      >
-                        <Download size={14} />مخطط التسليح
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Construction Sheets + BBS */}
-                <ExportPanel
-                  stories={stories}
-                  slabs={slabs}
-                  beams={beamsWithLoads}
-                  columns={columns}
-                  beamDesigns={beamDesigns as any}
-                  colDesigns={colDesigns}
-                  slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }))}
-                  mat={mat}
-                  slabProps={slabProps}
-                  projectName="Structural Design Studio"
-                  analyzed={analyzed}
-                />
-
-                {/* BOQ */}
-                <BOQPanel
-                  stories={stories}
-                  slabs={slabs}
-                  beams={beamsWithLoads}
-                  columns={columns}
-                  beamDesigns={beamDesigns as any}
-                  colDesigns={colDesigns}
-                  slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) })) as any}
-                  slabProps={slabProps}
-                  analyzed={analyzed}
-                />
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">تصدير DXF</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button className="w-full min-h-[44px]" variant="outline" onClick={() => downloadDXF(generateStructuralDXF(slabs, beamsWithLoads, columns), 'structural_plan.dxf')}>مخطط إنشائي</Button>
+                    <Button className="w-full min-h-[44px]" variant="outline" onClick={() => downloadDXF(generateBeamLayoutDXF(beamsWithLoads, columns, slabs), 'beam_layout.dxf')}>مخطط الجسور</Button>
+                    <Button className="w-full min-h-[44px]" variant="outline" onClick={() => downloadDXF(generateColumnLayoutDXF(columns, slabs), 'column_layout.dxf')}>مخطط الأعمدة</Button>
+                    <Button className="w-full min-h-[44px]" variant="outline" disabled={!analyzed} onClick={() => {
+                      const rebarData = beamDesigns.map(d => {
+                        const beam = beamsWithLoads.find(b => b.id === d.beamId);
+                        return beam ? { beamId: d.beamId, b: beam.b, h: beam.h, x1: beam.x1, y1: beam.y1, x2: beam.x2, y2: beam.y2, topBars: Math.max(d.flexLeft.bars, d.flexRight.bars), topDia: d.flexLeft.dia, botBars: d.flexMid.bars, botDia: d.flexMid.dia, stirrups: d.shear.stirrups } : null;
+                      }).filter(Boolean) as any[];
+                      downloadDXF(generateReinforcementDXF(slabs, beamsWithLoads, columns, rebarData), 'reinforcement.dxf');
+                    }}>مخطط التسليح</Button>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Beam Rebar Detail Views */}
               {analyzed && beamDesigns.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground px-1">تفاصيل تسليح الجسور</h3>
+                <div className="mt-6 space-y-4">
+                  <h3 className="text-sm font-semibold text-foreground">تفاصيل تسليح الجسور</h3>
                   {beamDesigns.map(d => {
                     const beam = beamsWithLoads.find(b => b.id === d.beamId);
                     if (!beam) return null;

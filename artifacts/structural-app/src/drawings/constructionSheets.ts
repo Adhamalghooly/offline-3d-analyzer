@@ -776,7 +776,7 @@ function drawBuildingElevation(
 
 // =================== MAIN EXPORT FUNCTION ===================
 
-export async function generateConstructionSheets(
+export function generateConstructionSheets(
   slabs: Slab[],
   beams: Beam[],
   columns: Column[],
@@ -786,7 +786,7 @@ export async function generateConstructionSheets(
   projectName: string = 'Structural Design Studio',
   options?: ExportOptions,
   returnDoc: boolean = false,
-): Promise<jsPDF> {
+): jsPDF {
   const w = 420;
   const h = 297;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [w, h] });
@@ -1221,7 +1221,6 @@ export async function generateConstructionSheets(
   if (returnDoc) {
     return doc;
   }
-  const { savePDF } = await import('@/lib/platformDownload');
-  await savePDF(doc, `${projectName}_${floorCode}_Construction.pdf`);
+  doc.save(`${projectName}_${floorCode}_Construction.pdf`);
   return doc;
 }

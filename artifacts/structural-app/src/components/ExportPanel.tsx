@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Download, FileText, Layers, AlertCircle, Printer } from 'lucide-react';
-import { toast } from 'sonner';
 import type { Story, Slab, Beam, Column, MatProps, SlabProps } from '@/lib/structuralEngine';
 import { calculateDevelopmentLengths } from '@/lib/structuralEngine';
 import { generateConstructionSheets } from '@/drawings/constructionSheets';
@@ -81,17 +80,9 @@ export default function ExportPanel({
     return counts;
   }, [stories, beams, columns, slabs]);
 
-  const handleExport = async () => {
-    if (!analyzed) {
-      toast.warning('يجب تشغيل التحليل أولاً', { description: 'اذهب إلى النمذجة → التحليل وشغّل التحليل' });
-      return;
-    }
-    if (selectedCount === 0) { toast.warning('اختر دوراً واحداً على الأقل'); return; }
-    if (!anyDrawingSelected) { toast.warning('اختر نوع لوحة واحداً على الأقل'); return; }
-
+  const handleExport = () => {
+    if (!analyzed) return;
     setExporting(true);
-    const tid = toast.loading('جاري إنشاء اللوحات الإنشائية...');
-    let filesCount = 0;
 
     try {
       // For each selected floor, generate per-floor exports
@@ -133,51 +124,47 @@ export default function ExportPanel({
           // Construction sheets (beam layout, column layout, slab plan, beam elevations)
           if (drawingTypes.beamLayout || drawingTypes.columnLayout || drawingTypes.slabPlan || drawingTypes.beamElevation) {
             if (format === 'print') {
+              // Use HTML-based construction sheets with full Arabic text support
               openHTMLSheetsForPrint(
                 filtSlabs, filtBeams, filtCols,
                 filtBeamDesigns, filtColDesigns, filtSlabDesigns,
                 projectName, exportOptions
               );
             } else {
-              await generateConstructionSheets(
+              generateConstructionSheets(
                 filtSlabs, filtBeams, filtCols,
                 filtBeamDesigns, filtColDesigns, filtSlabDesigns,
                 projectName, exportOptions
               );
             }
-            filesCount++;
           }
 
           // BBS per floor
           if (drawingTypes.bbs) {
             const bbs = generateBBS(filtBeams, filtCols, filtSlabs, filtBeamDesigns, filtColDesigns, filtSlabDesigns);
-            await exportBBSToPDF(bbs, `${projectName}_BBS_${floorCode}`);
-            filesCount++;
+            exportBBSToPDF(bbs, `${projectName}_BBS_${floorCode}`);
           }
         }
 
         // DXF exports per floor
         if (format === 'dxf' || format === 'both') {
           if (drawingTypes.beamLayout) {
-            await downloadDXF(generateBeamLayoutDXF(filtBeams, filtCols, filtSlabs), `${projectName}_${floorCode}_beams.dxf`);
-            filesCount++;
+            downloadDXF(generateBeamLayoutDXF(filtBeams, filtCols, filtSlabs), `${projectName}_${floorCode}_beams.dxf`);
           }
           if (drawingTypes.columnLayout) {
-            await downloadDXF(generateColumnLayoutDXF(filtCols, filtSlabs), `${projectName}_${floorCode}_columns.dxf`);
-            filesCount++;
+            downloadDXF(generateColumnLayoutDXF(filtCols, filtSlabs), `${projectName}_${floorCode}_columns.dxf`);
           }
-          await downloadDXF(generateStructuralDXF(filtSlabs, filtBeams, filtCols), `${projectName}_${floorCode}_structural.dxf`);
-          filesCount++;
+          downloadDXF(generateStructuralDXF(filtSlabs, filtBeams, filtCols), `${projectName}_${floorCode}_structural.dxf`);
         }
       }
 
       // Building elevation (once for all stories, not per-floor)
       if ((format === 'pdf' || format === 'both') && drawingTypes.buildingElevation) {
+        // Building elevation uses ALL stories — generated via constructionSheets with all elements
         const allFilteredSlabs = slabs.filter(s => !s.storyId || selectedFloors.includes(s.storyId));
         const allFilteredBeams = beams.filter(b => !b.storyId || selectedFloors.includes(b.storyId));
         const allFilteredCols = columns.filter(c => !c.storyId || selectedFloors.includes(c.storyId));
-        await exportStructuralDrawingPDF(allFilteredSlabs, allFilteredBeams, allFilteredCols, sheetSize === 'A1' ? 'A3' : sheetSize, projectName);
-        filesCount++;
+        exportStructuralDrawingPDF(allFilteredSlabs, allFilteredBeams, allFilteredCols, sheetSize === 'A1' ? 'A3' : sheetSize, projectName);
       }
 
       // Total BBS for all selected floors combined
@@ -189,22 +176,8 @@ export default function ExportPanel({
         const allFilteredColDesigns = colDesigns.filter((c: any) => allFilteredCols.some(col => col.id === c.id));
         const allFilteredSlabDesigns = slabDesigns.filter((s: any) => allFilteredSlabs.some(sl => sl.id === s.id));
         const totalBbs = generateBBS(allFilteredBeams, allFilteredCols, allFilteredSlabs, allFilteredBeamDesigns, allFilteredColDesigns, allFilteredSlabDesigns);
-        await exportBBSToPDF(totalBbs, `${projectName}_BBS_Total`);
-        filesCount++;
+        exportBBSToPDF(totalBbs, `${projectName}_BBS_Total`);
       }
-
-      toast.dismiss(tid);
-      if (filesCount > 0) {
-        toast.success(`تم التصدير بنجاح — ${filesCount} ملف`, {
-          description: 'تحقق من مجلد التنزيلات في جهازك',
-          duration: 5000,
-        });
-      } else {
-        toast.info('لا توجد عناصر لتصديرها في الأدوار المختارة');
-      }
-    } catch (e: any) {
-      toast.dismiss(tid);
-      toast.error('فشل التصدير', { description: e?.message || 'حدث خطأ غير متوقع، حاول مرة أخرى' });
     } finally {
       setExporting(false);
     }
