@@ -2,30 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design system. All colors are HSL triples consumed by tailwind.config.ts via hsl(var(--xxx)). */
-
+/* ===================== DESIGN TOKENS ===================== */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 20% 97%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --popover-foreground: 222 47% 11%;
+    --primary: 217 72% 28%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 25% 92%;
+    --secondary-foreground: 217 72% 28%;
+    --muted: 215 20% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 213 94% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 217 72% 28%;
+    --radius: 0.625rem;
 
     --canvas-grid: 220 13% 91%;
     --canvas-crosshair: 220 13% 70%;
@@ -45,31 +44,39 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* App-specific */
+    --nav-height: 64px;
+    --header-height: 58px;
+    --nav-active: 213 94% 52%;
+    --nav-inactive: 215 16% 52%;
+    --nav-bg: 0 0% 100%;
+    --header-bg: 217 72% 22%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 222 47% 8%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 40% 12%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 213 94% 60%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 217 32% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 32% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 213 94% 60%;
+    --accent-foreground: 222 47% 8%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 217 32% 20%;
+    --input: 217 32% 20%;
+    --ring: 213 94% 60%;
 
-    --canvas-grid: 220 10% 30%;
-    --canvas-crosshair: 220 10% 50%;
+    --canvas-grid: 220 10% 25%;
+    --canvas-crosshair: 220 10% 45%;
     --slab: 210 50% 60%;
     --slab-fill: 210 50% 60%;
     --column: 210 40% 70%;
@@ -78,24 +85,282 @@
     --stress-warn: 45 80% 55%;
     --stress-danger: 0 70% 55%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --nav-bg: 222 40% 10%;
+    --header-bg: 222 47% 10%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+  body { @apply bg-background text-foreground font-sans; }
   html { direction: rtl; }
 }
 
-/* Helper class used by Index.tsx */
+/* ===================== APP SHELL ===================== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: hsl(var(--background));
+}
+
+/* ===================== APP HEADER ===================== */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: var(--header-height);
+  background: hsl(var(--header-bg));
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  z-index: 50;
+}
+
+.app-header-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.app-header-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.app-header-icon-btn:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+/* ===================== SUB-TABS ===================== */
+.sub-tabs-bar {
+  display: flex;
+  align-items: stretch;
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0 8px;
+  gap: 2px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sub-tabs-bar::-webkit-scrollbar { display: none; }
+
+.sub-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sub-tab-btn:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted) / 0.5);
+}
+.sub-tab-btn.active {
+  color: hsl(var(--accent));
+  border-bottom-color: hsl(var(--accent));
+  font-weight: 600;
+}
+
+/* ===================== BOTTOM NAV ===================== */
+.bottom-nav {
+  display: flex;
+  align-items: stretch;
+  height: var(--nav-height);
+  background: hsl(var(--nav-bg));
+  border-top: 1px solid hsl(var(--border));
+  flex-shrink: 0;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: hsl(var(--nav-inactive));
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  transition: color 0.15s;
+  padding: 8px 4px;
+  position: relative;
+}
+
+.bottom-nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: hsl(var(--nav-active));
+  transition: width 0.2s;
+}
+
+.bottom-nav-item.active {
+  color: hsl(var(--nav-active));
+}
+
+.bottom-nav-item.active::before {
+  width: 32px;
+}
+
+.bottom-nav-icon-wrap {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.bottom-nav-item.active .bottom-nav-icon-wrap {
+  background: hsl(var(--nav-active) / 0.12);
+}
+
+/* ===================== PROPERTY LABEL ===================== */
 .property-label {
   @apply text-xs font-medium text-muted-foreground;
+}
+
+/* ===================== CONTENT AREA ===================== */
+.content-area {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===================== CARD IMPROVEMENTS ===================== */
+.export-card {
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.export-card-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.export-card-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ===================== ACTION BUTTON ===================== */
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  border: none;
+  width: 100%;
+}
+.action-btn:active { transform: scale(0.98); }
+.action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.action-btn-primary {
+  background: hsl(var(--accent));
+  color: #fff;
+  box-shadow: 0 2px 8px hsl(var(--accent) / 0.35);
+}
+
+.action-btn-outline {
+  background: transparent;
+  color: hsl(var(--accent));
+  border: 1.5px solid hsl(var(--accent) / 0.5);
+}
+.action-btn-outline:hover {
+  background: hsl(var(--accent) / 0.06);
+}
+
+.action-btn-secondary {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+/* ===================== ANALYSIS REQUIRED BANNER ===================== */
+.analysis-required-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: hsl(45 93% 47% / 0.12);
+  border: 1px solid hsl(45 93% 47% / 0.3);
+  color: hsl(30 70% 35%);
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+/* ===================== BADGE OVERRIDES ===================== */
+.status-badge-safe {
+  background: hsl(142 71% 45% / 0.12);
+  color: hsl(142 71% 30%);
+  border: 1px solid hsl(142 71% 45% / 0.3);
+}
+.status-badge-warn {
+  background: hsl(45 93% 47% / 0.12);
+  color: hsl(30 70% 35%);
+  border: 1px solid hsl(45 93% 47% / 0.3);
+}
+.status-badge-danger {
+  background: hsl(0 84% 60% / 0.1);
+  color: hsl(0 70% 40%);
+  border: 1px solid hsl(0 84% 60% / 0.2);
 }

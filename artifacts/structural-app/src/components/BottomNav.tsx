@@ -1,4 +1,6 @@
-import { FileText, Settings2, Compass, FolderOpen, Cpu } from 'lucide-react';
+import React from 'react';
+import { FileText, Settings2, FolderOpen, Cpu, Compass } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
 
 export type MainTab = 'reports' | 'inputs' | 'modeling' | 'projects' | 'solver';
 
@@ -7,12 +9,12 @@ interface BottomNavProps {
   onTabChange: (tab: MainTab) => void;
 }
 
-const tabs: { id: MainTab; label: string; icon: typeof FileText }[] = [
-  { id: 'projects', label: 'PROJECTS', icon: FolderOpen },
-  { id: 'inputs', label: 'INPUTS', icon: Settings2 },
-  { id: 'modeling', label: 'MODELING', icon: Compass },
-  { id: 'solver', label: 'SOLVER', icon: Cpu },
-  { id: 'reports', label: 'REPORTS', icon: FileText },
+const tabs: { id: MainTab; labelAr: string; icon: React.FC<LucideProps> }[] = [
+  { id: 'projects', labelAr: 'المشاريع', icon: FolderOpen },
+  { id: 'inputs', labelAr: 'المدخلات', icon: Settings2 },
+  { id: 'modeling', labelAr: 'النمذجة', icon: Compass },
+  { id: 'solver', labelAr: 'الحل', icon: Cpu },
+  { id: 'reports', labelAr: 'التقارير', icon: FileText },
 ];
 
 export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
@@ -25,12 +27,12 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`bottom-nav-item ${isActive ? 'active' : ''}`}
+            className={`bottom-nav-item${isActive ? ' active' : ''}`}
           >
-            <span className={isActive ? 'bottom-nav-icon' : ''}>
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
-            </span>
-            <span>{tab.label}</span>
+            <div className="bottom-nav-icon-wrap">
+              <Icon size={22} strokeWidth={isActive ? 2.2 : 1.6} />
+            </div>
+            <span>{tab.labelAr}</span>
           </button>
         );
       })}
