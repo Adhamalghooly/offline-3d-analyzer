@@ -397,5 +397,7 @@ export function generateStructuralReport(
   addText('  - Column compression lap: max(40db, 300mm) per §25.5.5');
   addText('  - All values rounded up to nearest mm');
 
-  doc.save(`${projectName}_Structural_Report.pdf`);
+  import('@/lib/capacitorDownload').then(({ downloadJsPDF }) =>
+    downloadJsPDF(doc, `${projectName}_Structural_Report.pdf`)
+  );
 }

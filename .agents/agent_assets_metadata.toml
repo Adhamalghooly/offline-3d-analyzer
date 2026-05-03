@@ -35,3 +35,9 @@ id = "CFbIgAdzLJPux8P0lpG4n"
 uri = "file://structural-master-v4-tabs-fixed.zip"
 type = "unspecified"
 title = "Structural Master v4 - التبويبات الفرعية مصلحة"
+
+[[outputs]]
+id = "fTpcZ7ZWRPnZH81_vng2j"
+uri = "file://structural-master-v5-export-fixed.zip"
+type = "unspecified"
+title = "Structural Master v5 - تصدير مباشر بدون مشاركة"

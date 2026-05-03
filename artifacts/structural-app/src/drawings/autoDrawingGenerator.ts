@@ -382,5 +382,7 @@ export function generateAutoDrawings(
     date: new Date().toLocaleDateString(),
   });
 
-  doc.save(`${projectName}_Structural_Drawings.pdf`);
+  import('@/lib/capacitorDownload').then(({ downloadJsPDF }) =>
+    downloadJsPDF(doc, `${projectName}_Structural_Drawings.pdf`)
+  );
 }

@@ -1,6 +1,5 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 import { Toast } from '@capacitor/toast';
 
 const isNative = () => Capacitor.isNativePlatform();
@@ -15,19 +14,21 @@ async function showToast(text: string) {
   }
 }
 
-async function requestStoragePermission(): Promise<boolean> {
-  try {
-    const { Filesystem: FS } = await import('@capacitor/filesystem');
-    const perm = await FS.requestPermissions();
-    return perm.publicStorage === 'granted';
-  } catch {
-    return true;
-  }
+async function saveToDocuments(filename: string, data: string, encoding?: Encoding): Promise<void> {
+  const opts: Parameters<typeof Filesystem.writeFile>[0] = {
+    path: filename,
+    data,
+    directory: Directory.Documents,
+    recursive: true,
+  };
+  if (encoding) opts.encoding = encoding;
+  await Filesystem.writeFile(opts);
+  await showToast(`تم حفظ الملف: ${filename}`);
 }
 
-export async function downloadText(filename: string, content: string, mimeType = 'text/plain'): Promise<void> {
+export async function downloadText(filename: string, content: string, _mimeType = 'text/plain'): Promise<void> {
   if (!isNative()) {
-    const blob = new Blob([content], { type: mimeType });
+    const blob = new Blob([content], { type: _mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -38,23 +39,8 @@ export async function downloadText(filename: string, content: string, mimeType =
     URL.revokeObjectURL(url);
     return;
   }
-
   try {
-    await requestStoragePermission();
-
-    const result = await Filesystem.writeFile({
-      path: filename,
-      data: content,
-      directory: Directory.Cache,
-      encoding: Encoding.UTF8,
-      recursive: true,
-    });
-
-    await Share.share({
-      title: filename,
-      url: result.uri,
-      dialogTitle: `حفظ ${filename}`,
-    });
+    await saveToDocuments(filename, content, Encoding.UTF8);
   } catch (err: any) {
     console.error('Capacitor file save error:', err);
     await showToast(`حدث خطأ أثناء حفظ الملف: ${err?.message || ''}`);
@@ -81,22 +67,8 @@ export async function downloadBase64(filename: string, base64Data: string, mimeT
     URL.revokeObjectURL(url);
     return;
   }
-
   try {
-    await requestStoragePermission();
-
-    const result = await Filesystem.writeFile({
-      path: filename,
-      data: base64Data,
-      directory: Directory.Cache,
-      recursive: true,
-    });
-
-    await Share.share({
-      title: filename,
-      url: result.uri,
-      dialogTitle: `حفظ ${filename}`,
-    });
+    await saveToDocuments(filename, base64Data);
   } catch (err: any) {
     console.error('Capacitor base64 save error:', err);
     await showToast(`حدث خطأ أثناء حفظ الملف: ${err?.message || ''}`);
@@ -117,20 +89,8 @@ export async function downloadJsPDF(doc: any, filename: string): Promise<void> {
     return;
   }
   try {
-    await requestStoragePermission();
-
     const base64 = doc.output('datauristring').split(',')[1];
-    const result = await Filesystem.writeFile({
-      path: filename,
-      data: base64,
-      directory: Directory.Cache,
-      recursive: true,
-    });
-    await Share.share({
-      title: filename,
-      url: result.uri,
-      dialogTitle: `حفظ ${filename}`,
-    });
+    await saveToDocuments(filename, base64);
   } catch (err: any) {
     console.error('PDF save error:', err);
     await showToast(`حدث خطأ أثناء حفظ PDF: ${err?.message || ''}`);
@@ -152,28 +112,15 @@ export async function openHTMLForPrint(htmlContent: string, jobName = 'اللو�
     }
     return;
   }
-
   try {
     const { PrintPlugin } = await import('@/lib/printPlugin');
     await PrintPlugin.printHTML({ html: htmlContent, jobName });
   } catch (err: any) {
     console.error('Android print error:', err);
     await showToast('جاري فتح مربع حوار الطباعة...');
-    // Fallback: save as HTML file and share so user can print
     try {
       const filename = `sheets_${Date.now()}.html`;
-      const result = await Filesystem.writeFile({
-        path: filename,
-        data: htmlContent,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8,
-        recursive: true,
-      });
-      await Share.share({
-        title: jobName,
-        url: result.uri,
-        dialogTitle: 'حفظ أو فتح اللوحات للطباعة',
-      });
+      await saveToDocuments(filename, htmlContent, Encoding.UTF8);
     } catch (e2: any) {
       await showToast('حدث خطأ أثناء تصدير اللوحات للطباعة');
     }

@@ -1221,6 +1221,8 @@ export function generateConstructionSheets(
   if (returnDoc) {
     return doc;
   }
-  doc.save(`${projectName}_${floorCode}_Construction.pdf`);
+  import('@/lib/capacitorDownload').then(({ downloadJsPDF }) =>
+    downloadJsPDF(doc, `${projectName}_${floorCode}_Construction.pdf`)
+  );
   return doc;
 }

@@ -515,7 +515,8 @@ export default function AnalysisDiagramDialog({ open, onClose, data }: AnalysisD
       doc.text(`Analysis Diagrams - ${data.elementType === 'beam' ? 'Beam' : 'Column'} ${data.elementId}`, 20, 20);
       doc.setFontSize(10);
       doc.text(`Length: ${data.span?.toFixed(2)} m`, 20, 30);
-      doc.save(`analysis_${data.elementId}.pdf`);
+      const { downloadJsPDF } = await import('@/lib/capacitorDownload');
+      await downloadJsPDF(doc, `analysis_${data.elementId}.pdf`);
     } catch {
       // fallback
     }

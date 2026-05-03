@@ -190,7 +190,8 @@ export default function BeamRebarDetailView({
         doc.text(`T:${sec.topB}\u03A6${sec.topD} B:${sec.botB}\u03A6${sec.botD}`, sec.cx, csOy + csH + 9, { align: 'center' });
       });
 
-      doc.save(`Beam_${beamId}_Details.pdf`);
+      const { downloadJsPDF } = await import('@/lib/capacitorDownload');
+      await downloadJsPDF(doc, `Beam_${beamId}_Details.pdf`);
     } catch (err) {
       console.error('PDF export error:', err);
     }
