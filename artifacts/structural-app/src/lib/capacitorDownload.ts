@@ -7,7 +7,21 @@ const isNative = () => Capacitor.isNativePlatform();
 
 async function showToast(text: string) {
   if (isNative()) {
-    await Toast.show({ text, duration: 'long' });
+    try {
+      await Toast.show({ text, duration: 'long' });
+    } catch {
+      console.warn('Toast failed:', text);
+    }
+  }
+}
+
+async function requestStoragePermission(): Promise<boolean> {
+  try {
+    const { Filesystem: FS } = await import('@capacitor/filesystem');
+    const perm = await FS.requestPermissions();
+    return perm.publicStorage === 'granted';
+  } catch {
+    return true;
   }
 }
 
@@ -26,6 +40,8 @@ export async function downloadText(filename: string, content: string, mimeType =
   }
 
   try {
+    await requestStoragePermission();
+
     const result = await Filesystem.writeFile({
       path: filename,
       data: content,
@@ -39,9 +55,9 @@ export async function downloadText(filename: string, content: string, mimeType =
       url: result.uri,
       dialogTitle: `حفظ ${filename}`,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Capacitor file save error:', err);
-    await showToast('حدث خطأ أثناء حفظ الملف');
+    await showToast(`حدث خطأ أثناء حفظ الملف: ${err?.message || ''}`);
   }
 }
 
@@ -67,6 +83,8 @@ export async function downloadBase64(filename: string, base64Data: string, mimeT
   }
 
   try {
+    await requestStoragePermission();
+
     const result = await Filesystem.writeFile({
       path: filename,
       data: base64Data,
@@ -79,9 +97,9 @@ export async function downloadBase64(filename: string, base64Data: string, mimeT
       url: result.uri,
       dialogTitle: `حفظ ${filename}`,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Capacitor base64 save error:', err);
-    await showToast('حدث خطأ أثناء حفظ الملف');
+    await showToast(`حدث خطأ أثناء حفظ الملف: ${err?.message || ''}`);
   }
 }
 
@@ -99,6 +117,8 @@ export async function downloadJsPDF(doc: any, filename: string): Promise<void> {
     return;
   }
   try {
+    await requestStoragePermission();
+
     const base64 = doc.output('datauristring').split(',')[1];
     const result = await Filesystem.writeFile({
       path: filename,
@@ -111,9 +131,9 @@ export async function downloadJsPDF(doc: any, filename: string): Promise<void> {
       url: result.uri,
       dialogTitle: `حفظ ${filename}`,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('PDF save error:', err);
-    await showToast('حدث خطأ أثناء حفظ PDF');
+    await showToast(`حدث خطأ أثناء حفظ PDF: ${err?.message || ''}`);
   }
 }
 
@@ -132,12 +152,14 @@ export async function openHTMLForPrint(htmlContent: string, jobName = 'اللو�
     }
     return;
   }
+
   try {
     const { PrintPlugin } = await import('@/lib/printPlugin');
     await PrintPlugin.printHTML({ html: htmlContent, jobName });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Android print error:', err);
-    // Fallback: save as HTML file and share
+    await showToast('جاري فتح مربع حوار الطباعة...');
+    // Fallback: save as HTML file and share so user can print
     try {
       const filename = `sheets_${Date.now()}.html`;
       const result = await Filesystem.writeFile({
@@ -150,10 +172,10 @@ export async function openHTMLForPrint(htmlContent: string, jobName = 'اللو�
       await Share.share({
         title: jobName,
         url: result.uri,
-        dialogTitle: 'حفظ أو فتح اللوحات',
+        dialogTitle: 'حفظ أو فتح اللوحات للطباعة',
       });
-    } catch (e2) {
-      await showToast('حدث خطأ أثناء تصدير اللوحات');
+    } catch (e2: any) {
+      await showToast('حدث خطأ أثناء تصدير اللوحات للطباعة');
     }
   }
 }

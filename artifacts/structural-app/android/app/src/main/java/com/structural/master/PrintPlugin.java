@@ -9,6 +9,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -17,6 +19,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "PrintPlugin")
 public class PrintPlugin extends Plugin {
+
+    private WebView printWebView;
 
     @PluginMethod
     public void printHTML(PluginCall call) {
@@ -33,32 +37,46 @@ public class PrintPlugin extends Plugin {
 
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
-                WebView webView = new WebView(getContext());
-                webView.setWebViewClient(new WebViewClient() {
+                printWebView = new WebView(getActivity());
+
+                printWebView.getSettings().setJavaScriptEnabled(true);
+                printWebView.getSettings().setDomStorageEnabled(true);
+                printWebView.getSettings().setAllowFileAccess(true);
+                printWebView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+
+                printWebView.setWebViewClient(new WebViewClient() {
                     @Override
                     public void onPageFinished(WebView view, String url) {
-                        PrintManager printManager =
-                            (PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            try {
+                                PrintManager printManager =
+                                    (PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
 
-                        PrintDocumentAdapter printAdapter =
-                            webView.createPrintDocumentAdapter(finalJobName);
+                                PrintDocumentAdapter printAdapter =
+                                    printWebView.createPrintDocumentAdapter(finalJobName);
 
-                        PrintAttributes.Builder builder = new PrintAttributes.Builder();
-                        builder.setMediaSize(PrintAttributes.MediaSize.ISO_A4);
-                        builder.setResolution(
-                            new PrintAttributes.Resolution("default", "default", 300, 300));
-                        builder.setMinMargins(PrintAttributes.Margins.NO_MARGINS);
+                                PrintAttributes.Builder builder = new PrintAttributes.Builder();
+                                builder.setMediaSize(PrintAttributes.MediaSize.ISO_A4);
+                                builder.setResolution(
+                                    new PrintAttributes.Resolution("default", "default", 300, 300));
+                                builder.setMinMargins(PrintAttributes.Margins.NO_MARGINS);
 
-                        PrintJob printJob = printManager.print(
-                            finalJobName, printAdapter, builder.build());
+                                PrintJob printJob = printManager.print(
+                                    finalJobName, printAdapter, builder.build());
 
-                        call.resolve();
+                                call.resolve();
+                            } catch (Exception e) {
+                                call.reject("Print failed: " + e.getMessage());
+                            } finally {
+                                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                    printWebView = null;
+                                }, 5000);
+                            }
+                        }, 500);
                     }
                 });
 
-                webView.getSettings().setJavaScriptEnabled(true);
-                webView.getSettings().setDomStorageEnabled(true);
-                webView.loadDataWithBaseURL(
+                printWebView.loadDataWithBaseURL(
                     "https://localhost",
                     finalHtml,
                     "text/html",
@@ -66,7 +84,7 @@ public class PrintPlugin extends Plugin {
                     null
                 );
             } catch (Exception e) {
-                call.reject("Print failed: " + e.getMessage());
+                call.reject("Print initialization failed: " + e.getMessage());
             }
         });
     }

@@ -17,3 +17,9 @@ id = "c_UUC-T7f0KK2zvKgzlDX"
 uri = "file://StructuralMaster_v2.zip"
 type = "unspecified"
 title = "StructuralMaster v2 APK (مُحدَّث)"
+
+[[outputs]]
+id = "XiIAeLYZWNtphQ1zl9Kww"
+uri = "file://structural-master-v2-fixed.zip"
+type = "unspecified"
+title = "Structural Master v2 - Fixed APK (داخل الضغط)"
