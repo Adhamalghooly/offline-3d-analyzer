@@ -1497,7 +1497,7 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Header */}
+      {/* Header - position:fixed, needs a spacer below */}
       <AppHeader 
         title="Structural Master"
         leftSlot={
@@ -1516,9 +1516,11 @@ const Index = () => {
           </div>
         }
       />
+      {/* Spacer that reserves space for the fixed header so content starts below it */}
+      <div className="shrink-0" style={{ height: 'var(--header-height)' }} />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" style={{ marginBottom: 'calc(var(--nav-height) + var(--safe-bottom))' }}>
         <Tabs value={activeTab} onValueChange={tab => dispatch({ type: 'SET_ACTIVE_TAB', tab })} className="h-full flex flex-col">
           
           {/* Sub-tabs within each main section */}

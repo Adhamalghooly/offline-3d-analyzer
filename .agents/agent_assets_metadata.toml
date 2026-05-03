@@ -29,3 +29,9 @@ id = "pKLFWeZeRnde3MnsdL5CE"
 uri = "file://structural-master-v3-fixed.zip"
 type = "unspecified"
 title = "Structural Master v3 - شاشة بيضاء مصلحة + طباعة + تصدير"
+
+[[outputs]]
+id = "CFbIgAdzLJPux8P0lpG4n"
+uri = "file://structural-master-v4-tabs-fixed.zip"
+type = "unspecified"
+title = "Structural Master v4 - التبويبات الفرعية مصلحة"
