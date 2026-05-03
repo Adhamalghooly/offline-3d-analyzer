@@ -23,3 +23,9 @@ id = "XiIAeLYZWNtphQ1zl9Kww"
 uri = "file://structural-master-v2-fixed.zip"
 type = "unspecified"
 title = "Structural Master v2 - Fixed APK (داخل الضغط)"
+
+[[outputs]]
+id = "pKLFWeZeRnde3MnsdL5CE"
+uri = "file://structural-master-v3-fixed.zip"
+type = "unspecified"
+title = "Structural Master v3 - شاشة بيضاء مصلحة + طباعة + تصدير"
