@@ -41,3 +41,9 @@ id = "fTpcZ7ZWRPnZH81_vng2j"
 uri = "file://structural-master-v5-export-fixed.zip"
 type = "unspecified"
 title = "Structural Master v5 - تصدير مباشر بدون مشاركة"
+
+[[outputs]]
+id = "30f_z8lPlslk58sUMyITK"
+uri = "file://structural-master-v6-etabs-import.zip"
+type = "unspecified"
+title = "Structural Master v6 - استيراد ETABS محسّن"
