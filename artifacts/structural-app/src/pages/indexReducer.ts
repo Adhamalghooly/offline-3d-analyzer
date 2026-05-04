@@ -43,6 +43,7 @@ export interface AppState {
   colOverrides: Record<string, { b?: number; h?: number; L?: number; x?: number; y?: number }>;
   extraBeams: Beam[];
   extraColumns: Column[];
+  etabsImportMode: boolean;
   modalOpen: boolean;
   selectedElement: { type: 'beam' | 'column' | 'slab'; id: string } | null;
   elemPropsOpen: boolean;
@@ -159,7 +160,8 @@ export type AppAction =
   | { type: 'SET_COL_STIFFNESS_FACTOR'; value: number }
   | { type: 'SET_BOB_MANUAL_PRIMARY'; colId: string; direction: 'horizontal' | 'vertical' | null }
   | { type: 'MERGE_BEAMS'; mergedBeam: Beam; removedIds: string[] }
-  | { type: 'ADD_VIRTUAL_REMOVED_COLUMN'; colId: string; x: number; y: number };
+  | { type: 'ADD_VIRTUAL_REMOVED_COLUMN'; colId: string; x: number; y: number }
+  | { type: 'SET_ETABS_IMPORT_MODE'; value: boolean };
 
 const defaultStoryId = 'ST1';
 
@@ -219,6 +221,7 @@ export const initialState: AppState = {
   colOverrides: {},
   extraBeams: [],
   extraColumns: [],
+  etabsImportMode: false,
   modalOpen: false,
   selectedElement: null,
   elemPropsOpen: false,
@@ -365,6 +368,8 @@ function coreReducer(state: AppState, action: AppAction): AppState {
       return { ...state, extraColumns: state.extraColumns.map(c => c.id === action.id ? { ...c, ...action.updates } : c), manualBeamsGenerated: false, analyzed: false };
     case 'SET_EXTRA_COLUMNS':
       return { ...state, extraColumns: action.columns, manualBeamsGenerated: false, analyzed: false };
+    case 'SET_ETABS_IMPORT_MODE':
+      return { ...state, etabsImportMode: action.value, analyzed: false };
     case 'OPEN_MODAL':
       return { ...state, modalOpen: true, selectedElement: action.element };
     case 'CLOSE_MODAL':

@@ -47,3 +47,9 @@ id = "30f_z8lPlslk58sUMyITK"
 uri = "file://structural-master-v6-etabs-import.zip"
 type = "unspecified"
 title = "Structural Master v6 - استيراد ETABS محسّن"
+
+[[outputs]]
+id = "43c-FZHoxxNnguOZNSyTf"
+uri = "file://structural-master-v7-etabs-names.zip"
+type = "unspecified"
+title = "Structural Master v7 - أسماء أصلية + إيقاف التوليد التلقائي"

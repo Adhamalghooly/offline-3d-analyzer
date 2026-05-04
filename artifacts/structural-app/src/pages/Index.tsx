@@ -115,7 +115,7 @@ const Index = () => {
     analyzed, frameResults, bobConnections, selectedEngine, ignoreSlab, beamStiffnessFactor, colStiffnessFactor,
     activeTab, mode, activeTool, pendingNode,
     selectedNodeId, selectedFrameId, selectedAreaId,
-    removedColumnIds, removedBeamIds, beamOverrides, colOverrides, slabPropsOverrides, extraBeams, extraColumns, supportRestraints, frameEndReleases, transientFrameEndReleases,
+    removedColumnIds, removedBeamIds, beamOverrides, colOverrides, slabPropsOverrides, extraBeams, extraColumns, etabsImportMode, supportRestraints, frameEndReleases, transientFrameEndReleases,
     modalOpen, selectedElement, elemPropsOpen, elemPropsFrameId, elemPropsAreaId,
     diagramOpen, diagramData, savedMessage, bobManualPrimary,
   } = state;
@@ -246,6 +246,14 @@ const Index = () => {
   }, [slabs, beamB, beamH, colB, colH, colL, slabProps.thickness, mode, frameEndReleases]);
 
   const columns = useMemo(() => {
+    // When ETABS import mode is active, skip auto-generation and use imported columns only
+    if (etabsImportMode) {
+      return extraColumns.map(c => ({
+        ...c,
+        zBottom: c.zBottom ?? 0,
+        zTop: c.zTop ?? (c.L || 0),
+      }));
+    }
     // Get unique column positions from slabs (ignoring storyId for position extraction)
     const uniqueSlabs = slabs.filter((s, i, arr) => {
       // Use first occurrence of each slab position pattern per story
@@ -301,9 +309,13 @@ const Index = () => {
       });
     }
     return allCols;
-  }, [slabs, colB, colH, colL, colLBelow, removedColumnIds, colOverrides, extraColumns, colTopEndCondition, colBottomEndCondition, stories, selectedStoryId, supportRestraints]);
+  }, [slabs, colB, colH, colL, colLBelow, removedColumnIds, colOverrides, extraColumns, etabsImportMode, colTopEndCondition, colBottomEndCondition, stories, selectedStoryId, supportRestraints]);
 
   const beams = useMemo(() => {
+    // When ETABS import mode is active, skip auto-generation and use imported beams only
+    if (etabsImportMode) {
+      return extraBeams.map(b => ({ ...b, z: b.z ?? 0 }));
+    }
     // Deduplicate slabs by position to generate base beam topology (avoid multi-story duplication)
     const uniqueSlabsByPos = new Map<string, Slab>();
     for (const s of slabs) {
@@ -391,7 +403,7 @@ const Index = () => {
       allBeams.push({ ...eb, z: eb.z ?? 0 });
     }
     return allBeams;
-  }, [slabs, columns, beamB, beamH, beamOverrides, extraBeams, stories, selectedStoryId, colL]);
+  }, [slabs, columns, beamB, beamH, beamOverrides, extraBeams, etabsImportMode, stories, selectedStoryId, colL]);
 
   // Build model nodes map for looking up node IDs by coordinates
   const modelNodesMap = useMemo(() => {
@@ -2186,37 +2198,82 @@ const Index = () => {
               </TabsContent>
               <TabsContent value="slabs-etabs-import" className="flex-1 overflow-y-auto p-3 md:p-4 mt-0 pb-20 md:pb-4">
                 <ETABSFullImportPanel onApply={(data) => {
-                  // Convert imported ETABS data to app model
                   const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
-                  
-                  // Create stories from unique story names
-                  const storyNames = new Set<string>();
-                  data.beams.forEach(b => storyNames.add(b.story));
-                  data.columns.forEach(c => storyNames.add(c.story));
-                  data.slabs.forEach(s => storyNames.add(s.story));
-                  
-                  // Convert slabs using node coordinates
+                  const storyId = stories[0]?.id ?? 'ST1';
+
+                  // ── 1. تحويل البلاطات مع أسمائها الأصلية ──
                   const newSlabs: Slab[] = [];
                   for (const s of data.slabs) {
-                    if (s.nodes.length >= 4) {
-                      const coords = s.nodes.map(nId => nodeMap.get(nId)).filter(Boolean);
-                      if (coords.length >= 4) {
-                        const xs = coords.map(c => c!.x);
-                        const ys = coords.map(c => c!.y);
-                        newSlabs.push({
-                          id: s.id,
-                          x1: Math.min(...xs), y1: Math.min(...ys),
-                          x2: Math.max(...xs), y2: Math.max(...ys),
-                          storyId: stories[0]?.id,
-                        });
-                      }
+                    const coords = s.nodes.map(nId => nodeMap.get(nId)).filter(Boolean);
+                    if (coords.length >= 3) {
+                      const xs = coords.map(c => c!.x);
+                      const ys = coords.map(c => c!.y);
+                      newSlabs.push({
+                        id: s.id,                       // الاسم الأصلي من الملف
+                        x1: Math.min(...xs), y1: Math.min(...ys),
+                        x2: Math.max(...xs), y2: Math.max(...ys),
+                        storyId,
+                      });
                     }
                   }
-                  
-                  if (newSlabs.length > 0) {
-                    dispatch({ type: 'SET_SLABS', slabs: newSlabs });
-                    dispatch({ type: 'SET_MODE', mode: 'auto' });
-                    dispatch({ type: 'SAVE_SNAPSHOT', message: `تم استيراد ${newSlabs.length} بلاطة و ${data.beams.length} جسر من ETABS ✓` });
+
+                  // ── 2. تحويل الجسور مع أسمائها الأصلية ──
+                  const newBeams: Beam[] = [];
+                  for (const b of data.beams) {
+                    const ni = nodeMap.get(b.nodeI);
+                    const nj = nodeMap.get(b.nodeJ);
+                    if (!ni || !nj) continue;
+                    const dx = nj.x - ni.x;
+                    const dy = nj.y - ni.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    const direction: 'horizontal' | 'vertical' = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
+                    newBeams.push({
+                      id: b.id,                         // الاسم الأصلي من الملف
+                      fromCol: b.nodeI,
+                      toCol: b.nodeJ,
+                      x1: ni.x, y1: ni.y,
+                      x2: nj.x, y2: nj.y,
+                      z: (ni.z + nj.z) / 2 * 1000,     // تحويل م → مم
+                      length: len,
+                      direction,
+                      b: beamB,
+                      h: beamH,
+                      deadLoad: 0,
+                      liveLoad: 0,
+                      slabs: [],
+                      storyId,
+                    });
+                  }
+
+                  // ── 3. تحويل الأعمدة مع أسمائها الأصلية ──
+                  const newColumns: Column[] = [];
+                  for (const c of data.columns) {
+                    const ni = nodeMap.get(c.nodeI);
+                    const nj = nodeMap.get(c.nodeJ);
+                    if (!ni) continue;
+                    const zBot = (ni.z ?? 0) * 1000;    // م → مم
+                    const zTop = nj ? (nj.z ?? 0) * 1000 : zBot + colL;
+                    const L = Math.max(zTop - zBot, colL);
+                    newColumns.push({
+                      id: c.id,                         // الاسم الأصلي من الملف
+                      x: ni.x,
+                      y: ni.y,
+                      b: colB,
+                      h: colH,
+                      L,
+                      zBottom: zBot,
+                      zTop: zTop,
+                      storyId,
+                    });
+                  }
+
+                  // ── 4. رفع البيانات إلى الحالة مع تفعيل وضع الاستيراد ──
+                  if (newSlabs.length > 0 || newBeams.length > 0 || newColumns.length > 0) {
+                    if (newSlabs.length > 0) dispatch({ type: 'SET_SLABS', slabs: newSlabs });
+                    dispatch({ type: 'SET_EXTRA_BEAMS', beams: newBeams });
+                    dispatch({ type: 'SET_EXTRA_COLUMNS', columns: newColumns });
+                    dispatch({ type: 'SET_ETABS_IMPORT_MODE', value: true });
+                    dispatch({ type: 'SAVE_SNAPSHOT', message: `✓ ETABS: ${newColumns.length} عمود | ${newBeams.length} جسر | ${newSlabs.length} بلاطة` });
                   }
                 }} />
               </TabsContent>
