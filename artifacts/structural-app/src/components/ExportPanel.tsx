@@ -16,6 +16,22 @@ import type { ExportOptions, DevelopmentLengths } from '@/drawings/drawingStanda
 
 
 
+interface TitleBlockConfig {
+  projectName?: string;
+  clientName?: string;
+  projectLocation?: string;
+  drawingTitle?: string;
+  firmName?: string;
+  designedBy?: string;
+  checkedBy?: string;
+  drawnBy?: string;
+  approvedBy?: string;
+  revision?: string;
+  date?: string;
+  scale?: string;
+  drawingNumber?: string;
+}
+
 interface ExportPanelProps {
   stories: Story[];
   slabs: Slab[];
@@ -27,12 +43,13 @@ interface ExportPanelProps {
   mat: MatProps;
   slabProps: SlabProps;
   projectName?: string;
+  titleBlockConfig?: TitleBlockConfig;
   analyzed: boolean;
 }
 
 export default function ExportPanel({
   stories, slabs, beams, columns, beamDesigns, colDesigns, slabDesigns,
-  mat, slabProps, projectName = 'Structural Design Studio', analyzed,
+  mat, slabProps, projectName = 'Structural Design Studio', titleBlockConfig, analyzed,
 }: ExportPanelProps) {
   const [selectedFloors, setSelectedFloors] = useState<string[]>(stories.map(s => s.id));
   const [drawingTypes, setDrawingTypes] = useState({
@@ -113,7 +130,19 @@ export default function ExportPanel({
           floorCode,
           devLengths,
           titleBlockConfig: {
-            projectName,
+            projectName: titleBlockConfig?.projectName || projectName,
+            clientName: titleBlockConfig?.clientName,
+            projectLocation: titleBlockConfig?.projectLocation,
+            drawingTitle: titleBlockConfig?.drawingTitle,
+            firmName: titleBlockConfig?.firmName,
+            designedBy: titleBlockConfig?.designedBy,
+            checkedBy: titleBlockConfig?.checkedBy,
+            drawnBy: titleBlockConfig?.drawnBy,
+            approvedBy: titleBlockConfig?.approvedBy,
+            revision: titleBlockConfig?.revision,
+            date: titleBlockConfig?.date,
+            scale: titleBlockConfig?.scale,
+            drawingNumber: titleBlockConfig?.drawingNumber,
             fc: mat.fc,
             fy: mat.fy,
           },

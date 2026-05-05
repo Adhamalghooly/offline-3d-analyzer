@@ -86,6 +86,24 @@ export interface AppState {
    * المفتاح: removedColumnId، القيمة: اتجاه الجسر الحامل المفروض ('horizontal' | 'vertical').
    */
   bobManualPrimary: Record<string, 'horizontal' | 'vertical'>;
+  /** نتائج التحليل المستوردة من ETABS لاستخدامها في التصميم */
+  etabsAnalysisData: { beamId: string; story: string; Mleft: number; Mmid: number; Mright: number; Vu: number }[];
+  /** معلومات جدول اللوحة (Title Block) */
+  titleBlockConfig: {
+    projectName: string;
+    clientName: string;
+    projectLocation: string;
+    drawingTitle: string;
+    firmName: string;
+    designedBy: string;
+    checkedBy: string;
+    drawnBy: string;
+    approvedBy: string;
+    revision: string;
+    date: string;
+    scale: string;
+    drawingNumber: string;
+  };
 }
 
 export type AppAction =
@@ -161,7 +179,9 @@ export type AppAction =
   | { type: 'SET_BOB_MANUAL_PRIMARY'; colId: string; direction: 'horizontal' | 'vertical' | null }
   | { type: 'MERGE_BEAMS'; mergedBeam: Beam; removedIds: string[] }
   | { type: 'ADD_VIRTUAL_REMOVED_COLUMN'; colId: string; x: number; y: number }
-  | { type: 'SET_ETABS_IMPORT_MODE'; value: boolean };
+  | { type: 'SET_ETABS_IMPORT_MODE'; value: boolean }
+  | { type: 'SET_ETABS_ANALYSIS_DATA'; data: AppState['etabsAnalysisData'] }
+  | { type: 'SET_TITLE_BLOCK_CONFIG'; config: Partial<AppState['titleBlockConfig']> };
 
 const defaultStoryId = 'ST1';
 
@@ -222,6 +242,22 @@ export const initialState: AppState = {
   extraBeams: [],
   extraColumns: [],
   etabsImportMode: false,
+  etabsAnalysisData: [],
+  titleBlockConfig: {
+    projectName: '',
+    clientName: '',
+    projectLocation: '',
+    drawingTitle: 'مخططات التصميم الإنشائي',
+    firmName: '',
+    designedBy: '',
+    checkedBy: '',
+    drawnBy: '',
+    approvedBy: '',
+    revision: 'R0',
+    date: new Date().toLocaleDateString('ar-SA'),
+    scale: '1:50',
+    drawingNumber: '',
+  },
   modalOpen: false,
   selectedElement: null,
   elemPropsOpen: false,
@@ -370,6 +406,10 @@ function coreReducer(state: AppState, action: AppAction): AppState {
       return { ...state, extraColumns: action.columns, manualBeamsGenerated: false, analyzed: false };
     case 'SET_ETABS_IMPORT_MODE':
       return { ...state, etabsImportMode: action.value, analyzed: false };
+    case 'SET_ETABS_ANALYSIS_DATA':
+      return { ...state, etabsAnalysisData: action.data };
+    case 'SET_TITLE_BLOCK_CONFIG':
+      return { ...state, titleBlockConfig: { ...state.titleBlockConfig, ...action.config } };
     case 'OPEN_MODAL':
       return { ...state, modalOpen: true, selectedElement: action.element };
     case 'CLOSE_MODAL':

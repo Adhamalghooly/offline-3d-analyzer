@@ -73,6 +73,8 @@ import SlabAnalysisPanel from "@/components/SlabAnalysisPanel";
 import SlabLoadDiagnosticPanel from "@/components/SlabLoadDiagnosticPanel";
 import ETABSFullImportPanel from "@/components/ETABSFullImportPanel";
 import type { ETABSImportedData } from "@/components/ETABSFullImportPanel";
+import ETABSAnalysisImport from "@/components/ETABSAnalysisImport";
+import type { ETABSBeamResult } from "@/components/ETABSAnalysisImport";
 
 const ParamInput = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
   <div className="space-y-1">
@@ -115,7 +117,7 @@ const Index = () => {
     analyzed, frameResults, bobConnections, selectedEngine, ignoreSlab, beamStiffnessFactor, colStiffnessFactor,
     activeTab, mode, activeTool, pendingNode,
     selectedNodeId, selectedFrameId, selectedAreaId,
-    removedColumnIds, removedBeamIds, beamOverrides, colOverrides, slabPropsOverrides, extraBeams, extraColumns, etabsImportMode, supportRestraints, frameEndReleases, transientFrameEndReleases,
+    removedColumnIds, removedBeamIds, beamOverrides, colOverrides, slabPropsOverrides, extraBeams, extraColumns, etabsImportMode, etabsAnalysisData, titleBlockConfig, supportRestraints, frameEndReleases, transientFrameEndReleases,
     modalOpen, selectedElement, elemPropsOpen, elemPropsFrameId, elemPropsAreaId,
     diagramOpen, diagramData, savedMessage, bobManualPrimary,
   } = state;
@@ -157,6 +159,10 @@ const Index = () => {
 
   // ETABS beam data for comparison table persistence
   const [etabsCompBeamData, setEtabsCompBeamData] = React.useState<{ beamId: string; Mleft: number; Mmid: number; Mright: number }[]>([]);
+
+  // Design tab: source selector + manual trigger
+  const [designSource, setDesignSource] = React.useState<'app' | 'etabs'>('app');
+  const [designExecuted, setDesignExecuted] = React.useState(false);
 
   // Available elevations from stories
   const availableElevations = useMemo(() => {
@@ -743,7 +749,52 @@ const Index = () => {
   }, [releaseEditorData]);
 
   const beamDesigns = useMemo(() => {
-    if (!analyzed) return [];
+    // ── مسار ETABS: تصميم من نتائج ETABS المستوردة ──
+    if (designSource === 'etabs' && designExecuted && etabsAnalysisData.length > 0) {
+      const designs: {
+        beamId: string; frameId: string; span: number;
+        Mleft: number; Mmid: number; Mright: number; Vu: number;
+        Rleft: number; Rright: number;
+        flexLeft: FlexureResult; flexMid: FlexureResult; flexRight: FlexureResult;
+        shear: ShearResult; deflection: DeflectionResult;
+      }[] = [];
+
+      for (const ed of etabsAnalysisData) {
+        const beam = beamsWithLoads.find(b => b.id === ed.beamId);
+        if (!beam) continue;
+        const span = beam.length > 0 ? beam.length / 1000 : 1;
+
+        const hasSlabs = beam.slabs.length > 0;
+        let effectiveFlangeWidth = 0;
+        if (hasSlabs) {
+          const widths: number[] = [];
+          for (const slabId of beam.slabs) {
+            const slab = slabs.find(s => s.id === slabId);
+            if (slab) widths.push(beam.direction === 'horizontal' ? Math.abs(slab.y2 - slab.y1) : Math.abs(slab.x2 - slab.x1));
+          }
+          effectiveFlangeWidth = Math.min(span * 1000 / 4, beam.b + 16 * slabProps.thickness, widths.reduce((a, b) => a + b, 0) * 1000);
+        }
+
+        const flexLeft  = designFlexure(ed.Mleft,  beam.b, beam.h, mat.fc, mat.fy);
+        const flexMid   = designFlexure(ed.Mmid,   beam.b, beam.h, mat.fc, mat.fy, 40, hasSlabs, slabProps.thickness, effectiveFlangeWidth, 4);
+        const flexRight = designFlexure(ed.Mright, beam.b, beam.h, mat.fc, mat.fy);
+        const wuBeam = 1.2 * beam.deadLoad + 1.6 * beam.liveLoad;
+        const AsForShear = Math.max(flexLeft.As, flexMid.As, flexRight.As);
+        const shear = designShear(ed.Vu, beam.b, beam.h, mat.fc, mat.fyt, 40, mat.stirrupDia || 10, wuBeam, 300, AsForShear);
+        const deflection = calculateDeflection(span, beam.b, beam.h, mat.fc, beam.deadLoad, beam.liveLoad, flexMid.As, 'both-ends', 'B', flexMid.As * 0.3, 1.0, 60);
+
+        designs.push({
+          beamId: ed.beamId, frameId: '', span,
+          Mleft: ed.Mleft, Mmid: ed.Mmid, Mright: ed.Mright, Vu: ed.Vu,
+          Rleft: 0, Rright: 0,
+          flexLeft, flexMid, flexRight, shear, deflection,
+        });
+      }
+      return designs;
+    }
+
+    // ── مسار التطبيق: تصميم من محركات التحليل الداخلية ──
+    if (!analyzed || !designExecuted) return [];
     const designs: {
       beamId: string; frameId: string; span: number;
       Mleft: number; Mmid: number; Mright: number; Vu: number;
@@ -890,7 +941,7 @@ const Index = () => {
       }
     }
     return designs;
-  }, [frameResults, beamsWithLoads, mat, analyzed, bobConnections, slabs, slabProps]);
+  }, [frameResults, beamsWithLoads, mat, analyzed, bobConnections, slabs, slabProps, designSource, designExecuted, etabsAnalysisData]);
 
   // Beam diagnostics - detailed ACI 318-19 compliance check
   const beamDiagnostics = useMemo<Map<string, BeamDiagnostic>>(() => {
@@ -3255,37 +3306,89 @@ const Index = () => {
 
           {/* DESIGN TAB */}
           <TabsContent value="design" className="flex-1 overflow-y-auto p-3 md:p-4 mt-0 pb-20 md:pb-4">
-            {!analyzed ? (
-              <Card><CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">يرجى تشغيل التحليل أولاً</p>
-              </CardContent></Card>
-            ) : (
-              <div className="space-y-4">
-                {/* Design source selector */}
-                <Card className="border-blue-200 dark:border-blue-800 bg-blue-500/5">
-                  <CardContent className="py-3 px-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Zap size={14} className="text-blue-500 shrink-0" />
-                      <span className="text-xs font-semibold">مصدر نتائج التصميم</span>
+            <div className="space-y-4">
+              {/* ── Source Selector Card ── */}
+              <Card className="border-blue-200 dark:border-blue-800 bg-blue-500/5">
+                <CardContent className="py-3 px-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Zap size={14} className="text-blue-500 shrink-0" />
+                    <span className="text-xs font-bold">مصدر نتائج التحليل للتصميم</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      className={`px-3 py-2 rounded border text-xs font-medium transition-all ${designSource === 'app' ? 'bg-blue-600 text-white border-blue-600' : 'border-border hover:bg-muted'}`}
+                      onClick={() => { setDesignSource('app'); setDesignExecuted(false); }}
+                    >
+                      محركات التطبيق الداخلية
+                    </button>
+                    <button
+                      className={`px-3 py-2 rounded border text-xs font-medium transition-all ${designSource === 'etabs' ? 'bg-orange-600 text-white border-orange-600' : 'border-border hover:bg-muted'}`}
+                      onClick={() => { setDesignSource('etabs'); setDesignExecuted(false); }}
+                    >
+                      نتائج ETABS (xlsx)
+                    </button>
+                  </div>
+
+                  {/* App engine selector */}
+                  {designSource === 'app' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">محرك التحليل:</span>
                       <select
-                        className="h-8 rounded border border-input bg-background px-2 text-xs flex-1 min-w-[160px] max-w-[240px]"
+                        className="h-8 rounded border border-input bg-background px-2 text-xs flex-1 min-w-[160px] max-w-[260px]"
                         value={selectedEngine}
-                        onChange={e => {
-                          dispatch({ type: 'SET_ENGINE', engine: e.target.value as any });
-                        }}
+                        onChange={e => { dispatch({ type: 'SET_ENGINE', engine: e.target.value as any }); setDesignExecuted(false); }}
                       >
                         {(Object.entries(ENGINE_LABELS) as [string, string][]).map(([key, label]) => (
                           <option key={key} value={key}>{label}</option>
                         ))}
-                        <option value="etabs_import">استيراد من ETABS</option>
                       </select>
-                      {selectedEngine === 'etabs_import' as any && (
-                        <Badge variant="outline" className="text-xs">سيتم استخدام نتائج ETABS المستوردة</Badge>
-                      )}
+                      {!analyzed && <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-400">يلزم تشغيل التحليل أولاً</Badge>}
                     </div>
+                  )}
+
+                  {/* ETABS import */}
+                  {designSource === 'etabs' && (
+                    <ETABSAnalysisImport
+                      appliedCount={etabsAnalysisData.length}
+                      onApply={(results) => {
+                        dispatch({ type: 'SET_ETABS_ANALYSIS_DATA', data: results });
+                        setDesignExecuted(false);
+                      }}
+                    />
+                  )}
+
+                  {/* Design button */}
+                  <Button
+                    className="w-full min-h-[48px] gap-2 text-sm font-bold"
+                    disabled={
+                      (designSource === 'app' && !analyzed) ||
+                      (designSource === 'etabs' && etabsAnalysisData.length === 0)
+                    }
+                    onClick={() => setDesignExecuted(true)}
+                  >
+                    <Calculator size={16} />
+                    تشغيل التصميم
+                    {designExecuted && beamDesigns.length > 0 && (
+                      <Badge variant="secondary" className="text-[10px]">{beamDesigns.length} جسر</Badge>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* ── Results (only after designExecuted) ── */}
+              {!designExecuted ? (
+                <Card>
+                  <CardContent className="py-10 text-center text-muted-foreground text-sm">
+                    {designSource === 'etabs' && etabsAnalysisData.length === 0
+                      ? 'استورد ملف نتائج ETABS ثم اضغط "تشغيل التصميم"'
+                      : designSource === 'app' && !analyzed
+                      ? 'شغّل التحليل من تبويب التحليل ثم اضغط "تشغيل التصميم"'
+                      : 'اضغط "تشغيل التصميم" لعرض نتائج التصميم'
+                    }
                   </CardContent>
                 </Card>
-                
+              ) : (
+              <div className="space-y-4">
                 {/* Story filter for design */}
                 <StorySelector
                   stories={stories} selectedStoryId={selectedStoryId}
@@ -3524,7 +3627,8 @@ const Index = () => {
                   </Card>
                 )}
               </div>
-            )}
+              )}
+            </div>
           </TabsContent>
 
           {/* RESULTS TAB */}
@@ -3650,6 +3754,45 @@ const Index = () => {
           {/* EXPORT TAB */}
           <TabsContent value="export" className="flex-1 overflow-auto p-4">
             <div className="max-w-5xl space-y-6">
+
+              {/* ── Title Block Editor ── */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Settings2 size={14} />
+                    بيانات الغلاف (Title Block)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([
+                      { key: 'projectName',     label: 'اسم المشروع' },
+                      { key: 'clientName',      label: 'المالك / العميل' },
+                      { key: 'projectLocation', label: 'موقع المشروع' },
+                      { key: 'drawingTitle',    label: 'عنوان المخطط' },
+                      { key: 'firmName',        label: 'اسم المكتب الهندسي' },
+                      { key: 'designedBy',      label: 'صمّمه' },
+                      { key: 'checkedBy',       label: 'راجعه' },
+                      { key: 'drawnBy',         label: 'رسمه' },
+                      { key: 'approvedBy',      label: 'اعتمده' },
+                      { key: 'revision',        label: 'المراجعة' },
+                      { key: 'date',            label: 'التاريخ' },
+                      { key: 'scale',           label: 'المقياس' },
+                      { key: 'drawingNumber',   label: 'رقم المخطط' },
+                    ] as { key: keyof typeof titleBlockConfig; label: string }[]).map(({ key, label }) => (
+                      <div key={key} className="space-y-1">
+                        <label className="text-xs text-muted-foreground">{label}</label>
+                        <input
+                          className="w-full h-9 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={titleBlockConfig[key] as string}
+                          onChange={e => dispatch({ type: 'SET_TITLE_BLOCK_CONFIG', config: { [key]: e.target.value } })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* BOQ - Bill of Quantities */}
               <BOQPanel
                 stories={stories}
@@ -3673,7 +3816,8 @@ const Index = () => {
                 slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }))}
                 mat={mat}
                 slabProps={slabProps}
-                projectName="Structural Design Studio"
+                projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
+                titleBlockConfig={titleBlockConfig}
                 analyzed={analyzed}
               />
 

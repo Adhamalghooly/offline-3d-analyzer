@@ -53,3 +53,9 @@ id = "43c-FZHoxxNnguOZNSyTf"
 uri = "file://structural-master-v7-etabs-names.zip"
 type = "unspecified"
 title = "Structural Master v7 - أسماء أصلية + إيقاف التوليد التلقائي"
+
+[[outputs]]
+id = "Rtsc63R0mgF4gXnXGmEeS"
+uri = "file://structural-master-v8.zip"
+type = "unspecified"
+title = "Structural Master v8 APK"
