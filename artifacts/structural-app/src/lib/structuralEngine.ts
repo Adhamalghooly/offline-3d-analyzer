@@ -23,6 +23,14 @@ export interface Column {
   LBelow?: number;
   bBelow?: number;
   hBelow?: number;
+  /**
+   * Section orientation angle in degrees (counter-clockwise from Global X).
+   *   0°  → b is along Global X, h is along Global Y  (default)
+   *  90°  → b is along Global Y, h is along Global X
+   * Rotates the column's local axes so the strong axis can face any direction.
+   * ETABS equivalent: Local Axis 2 angle (beta angle).
+   */
+  orientAngle?: number;
 }
 export interface Beam {
   id: string; fromCol: string; toCol: string;
@@ -887,16 +895,26 @@ export function analyzeFrame(
 
     if (col && !isRemovedCol) {
       const Ec = 4700 * Math.sqrt(mat.fc) * 1000;
-
-      // Use correct moment of inertia based on frame direction:
-      // For horizontal frame (beams along X) → column bends about Y-axis → Iy = h * b³ / 12
-      // For vertical frame (beams along Y) → column bends about X-axis → Ix = b * h³ / 12
       const frameDir = frame.direction;
       const colBm = col.b / 1000;
       const colHm = col.h / 1000;
+
+      // Principal moments of inertia (about local Y and local Z axes at orientAngle=0):
+      //   Ip1 = b × h³/12  → resists bending induced by Y-direction beams (about Global X)
+      //   Ip2 = h × b³/12  → resists bending induced by X-direction beams (about Global Y)
+      // For a rotated section (orientAngle α), use the Mohr's circle transformation:
+      //   I_about_GlobalX = Ip1·cos²(α) + Ip2·sin²(α)
+      //   I_about_GlobalY = Ip1·sin²(α) + Ip2·cos²(α)
+      const Ip1 = colBm * Math.pow(colHm, 3) / 12;  // b × h³/12
+      const Ip2 = colHm * Math.pow(colBm, 3) / 12;  // h × b³/12
+      const colAlpha = ((col.orientAngle ?? 0) * Math.PI) / 180;
+      const c2 = Math.pow(Math.cos(colAlpha), 2);
+      const s2 = Math.pow(Math.sin(colAlpha), 2);
+      // X-frame (horizontal, along Global X) → column bends about Global Y → Ip1·sin²+Ip2·cos²
+      // Y-frame (vertical,   along Global Y) → column bends about Global X → Ip1·cos²+Ip2·sin²
       const Ic_below = frameDir === 'horizontal'
-        ? colHm * Math.pow(colBm, 3) / 12   // Iy for bending about Y-axis
-        : colBm * Math.pow(colHm, 3) / 12;  // Ix for bending about X-axis
+        ? Ip1 * s2 + Ip2 * c2
+        : Ip1 * c2 + Ip2 * s2;
       const Lc_below = col.L / 1000;
       const farEndFactorBelow = col.bottomEndCondition === 'P' ? 3 : 4;
       colStiffnessBelow = farEndFactorBelow * Ec * (colStiffnessFactor * Ic_below) / Lc_below;
@@ -905,9 +923,11 @@ export function analyzeFrame(
       if (col.LBelow && col.LBelow > 0) {
         const bAbove = (col.bBelow || col.b) / 1000;
         const hAbove = (col.hBelow || col.h) / 1000;
+        const Ip1a = bAbove * Math.pow(hAbove, 3) / 12;
+        const Ip2a = hAbove * Math.pow(bAbove, 3) / 12;
         const Ic_above = frameDir === 'horizontal'
-          ? hAbove * Math.pow(bAbove, 3) / 12
-          : bAbove * Math.pow(hAbove, 3) / 12;
+          ? Ip1a * s2 + Ip2a * c2
+          : Ip1a * c2 + Ip2a * s2;
         const Lc_above = col.LBelow / 1000;
         const farEndFactorAbove = col.topEndCondition === 'P' ? 3 : 4;
         colStiffnessAbove = farEndFactorAbove * Ec * (colStiffnessFactor * Ic_above) / Lc_above;

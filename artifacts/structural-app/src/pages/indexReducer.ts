@@ -40,7 +40,7 @@ export interface AppState {
   removedBeamIds: string[];
   beamOverrides: Record<string, { b?: number; h?: number; wallLoad?: number; x1?: number; y1?: number; x2?: number; y2?: number; z?: number }>;
   slabPropsOverrides: Record<number, { thickness?: number; finishLoad?: number; liveLoad?: number; cover?: number }>;
-  colOverrides: Record<string, { b?: number; h?: number; L?: number; x?: number; y?: number }>;
+  colOverrides: Record<string, { b?: number; h?: number; L?: number; x?: number; y?: number; orientAngle?: number }>;
   extraBeams: Beam[];
   extraColumns: Column[];
   etabsImportMode: boolean;
@@ -138,7 +138,7 @@ export type AppAction =
   | { type: 'TOGGLE_COLUMN_REMOVAL'; colId: string }
   | { type: 'TOGGLE_BEAM_REMOVAL'; beamId: string }
   | { type: 'SET_BEAM_OVERRIDE'; beamId: string; override: { b?: number; h?: number; wallLoad?: number; x1?: number; y1?: number; x2?: number; y2?: number; z?: number } }
-  | { type: 'SET_COL_OVERRIDE'; colId: string; override: { b?: number; h?: number; L?: number; x?: number; y?: number } }
+  | { type: 'SET_COL_OVERRIDE'; colId: string; override: { b?: number; h?: number; L?: number; x?: number; y?: number; orientAngle?: number } }
   | { type: 'SET_EXTRA_BEAMS'; beams: Beam[] }
   | { type: 'ADD_EXTRA_BEAM'; beam: Beam }
   | { type: 'REMOVE_EXTRA_BEAM'; id: string }

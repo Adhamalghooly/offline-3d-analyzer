@@ -156,6 +156,18 @@ function build3DModelWithPatternLoading(
 
     colTopNodeMap.set(col.id, topId);
 
+    // Orientation angle (beta angle): rotates the column's local Y axis
+    // in the plan by the given angle CCW from Global X.
+    //   0°  → local Y = Global X (b along X, h along Y)  — default
+    //  90°  → local Y = Global Y (b along Y, h along X)
+    // This controls which axis sees the strong vs weak moment of inertia.
+    const colAngleDeg = col.orientAngle ?? 0;
+    const colAngleRad = colAngleDeg * Math.PI / 180;
+    const localYOverride: [number, number, number] | undefined =
+      Math.abs(colAngleDeg) > 1e-4
+        ? [Math.cos(colAngleRad), Math.sin(colAngleRad), 0]
+        : undefined;
+
     elements3d.push({
       id: `col_${col.id}`,
       type: 'column',
@@ -167,6 +179,7 @@ function build3DModelWithPatternLoading(
       G,
       wLocal: { wx: -1.2 * mat.gamma * (col.b * col.h) / 1e6, wy: 0, wz: 0 },
       stiffnessModifier: colStiffnessFactor,
+      localYOverride,
     });
   }
 

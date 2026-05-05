@@ -43,6 +43,7 @@ artifacts/structural-app/src/
 - Foundation design uses Working Stress Method (ASD) per UBC 1997 / ACI 318 Appendix A — **not** ultimate strength (USD). Iterates footing thickness to satisfy shear.
 - ETABS import now parses three sheet types in one file: Element Forces-Beams, Element Forces-Columns, Support Reactions.
 - Foundation plan exported as self-contained HTML (SVG plan + summary table) for printing/PDF.
+- **Column orientation angle (`orientAngle`)**: `Column` interface now has `orientAngle?: number` (degrees CCW from Global X). 0°=b along X/h along Y (default). 3D engine passes `localYOverride=[cos α, sin α, 0]` to the solver. 2D moment-distribution path uses Mohr's circle: `I_x = Ip1·cos²α + Ip2·sin²α`, `I_y = Ip1·sin²α + Ip2·cos²α`. Persisted in `colOverrides`. Validation test: `runOrientationValidationTest()` in `solver3D.ts`.
 
 ## Product
 

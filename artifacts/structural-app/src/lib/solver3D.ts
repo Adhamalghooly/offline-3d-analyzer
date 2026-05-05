@@ -1709,3 +1709,117 @@ export function createACICombinations(
   
   return combos;
 }
+
+// ======================== VALIDATION: STRONG/WEAK AXIS TEST ========================
+
+/**
+ * Validates strong-vs-weak axis directional stiffness for a rectangular column.
+ *
+ * Test setup: cantilever column (base fixed), height H = 3000 mm.
+ * A unit lateral point load P = 1 kN is applied at the top:
+ *   • Case X: load along Global X → column bends about Global Y → uses Iz
+ *   • Case Y: load along Global Y → column bends about Global X → uses Iy
+ *
+ * Expected top deflection = P·H³/(3·E·I).
+ * For b=200, h=400 (angle=0°):
+ *   Iz = h·b³/12 = 400·200³/12 ≈ 266.7 × 10⁶ mm⁴  (WEAK for X-direction load)
+ *   Iy = b·h³/12 = 200·400³/12 ≈ 1066.7 × 10⁶ mm⁴ (STRONG for Y-direction load)
+ *   → deflection_X / deflection_Y = Iy / Iz = 4.0  (X is 4× more flexible)
+ *
+ * Returns a debug report string. Call from browser console:
+ *   import('@/lib/solver3D').then(m => console.log(m.runOrientationValidationTest()))
+ */
+export function runOrientationValidationTest(): string {
+  const E = 4700 * Math.sqrt(30) * 1000; // fc=30 MPa → E in kN/m² equivalent (mm units)
+  const G = 0.4 * E;
+  const H = 3000; // column height mm
+
+  interface TestCase { label: string; b: number; h: number; angle: number }
+  const cases: TestCase[] = [
+    { label: 'Case A: 200×400, angle=0°',  b: 200, h: 400, angle: 0  },
+    { label: 'Case B: 400×200, angle=0°',  b: 400, h: 200, angle: 0  },
+    { label: 'Case C: 200×400, angle=90°', b: 200, h: 400, angle: 90 },
+  ];
+
+  const lines: string[] = [];
+  lines.push('=== Strong/Weak Axis Orientation Validation ===');
+  lines.push(`E = ${(E / 1e6).toFixed(0)} MPa (fc=30 MPa),  H = ${H} mm\n`);
+
+  for (const tc of cases) {
+    const angleDeg = tc.angle;
+    const angleRad = angleDeg * Math.PI / 180;
+    const localYOverride: [number, number, number] | undefined =
+      Math.abs(angleDeg) > 1e-4 ? [Math.cos(angleRad), Math.sin(angleRad), 0] : undefined;
+
+    // Principal section properties (at angle=0)
+    const sec = rectangularSection(tc.b, tc.h); // Iy=b·h³/12, Iz=h·b³/12
+    // Effective inertia about Global X and Global Y after rotation by α:
+    //   Iy_global (resists loading in Y) = Iy·cos²(α) + Iz·sin²(α)
+    //   Iz_global (resists loading in X) = Iy·sin²(α) + Iz·cos²(α)
+    const c2 = Math.cos(angleRad) ** 2;
+    const s2 = Math.sin(angleRad) ** 2;
+    const Iy_global = sec.Iy * c2 + sec.Iz * s2;
+    const Iz_global = sec.Iy * s2 + sec.Iz * c2;
+
+    // Build 2-node cantilever: base fixed, top free
+    const model: Model3D = {
+      nodes: [
+        { id: 'bot', x: 0, y: 0, z: 0, restraints: [true, true, true, true, true, true] },
+        { id: 'top', x: 0, y: 0, z: H, restraints: [false, false, false, false, false, false] },
+      ],
+      elements: [{
+        id: 'col', type: 'column',
+        nodeI: 'bot', nodeJ: 'top',
+        b: tc.b, h: tc.h, E, G,
+        wLocal: { wx: 0, wy: 0, wz: 0 },
+        stiffnessModifier: 1.0,
+        localYOverride,
+      }],
+    };
+
+    // Unit load in X direction
+    const loadX: LoadCase3D = {
+      id: 'lx', name: 'X', type: 'dead',
+      elementLoads: new Map(),
+      nodalLoads: new Map([['top', [1, 0, 0, 0, 0, 0]]]),
+    };
+    // Unit load in Y direction
+    const loadY: LoadCase3D = {
+      id: 'ly', name: 'Y', type: 'dead',
+      elementLoads: new Map(),
+      nodalLoads: new Map([['top', [0, 1, 0, 0, 0, 0]]]),
+    };
+
+    const resX = analyze3DFrame(model, loadX);
+    const resY = analyze3DFrame(model, loadY);
+
+    const dispX = Math.abs(resX.displacements.get('top')?.[0] ?? 0);
+    const dispY = Math.abs(resY.displacements.get('top')?.[1] ?? 0);
+
+    // Analytical: δ = P·H³ / (3·E·I)
+    const expectedDispX = H ** 3 / (3 * E * Iz_global);
+    const expectedDispY = H ** 3 / (3 * E * Iy_global);
+    const errX = expectedDispX > 1e-20 ? Math.abs(dispX - expectedDispX) / expectedDispX * 100 : 0;
+    const errY = expectedDispY > 1e-20 ? Math.abs(dispY - expectedDispY) / expectedDispY * 100 : 0;
+
+    const ratio = dispX > 1e-20 && dispY > 1e-20 ? dispX / dispY : NaN;
+    const expectedRatio = expectedDispX / expectedDispY; // = Iy_global / Iz_global
+    const ratioErr = expectedRatio > 1e-20 ? Math.abs(ratio - expectedRatio) / expectedRatio * 100 : 0;
+
+    lines.push(`--- ${tc.label} ---`);
+    lines.push(`  b=${tc.b} mm, h=${tc.h} mm, orientAngle=${angleDeg}°`);
+    lines.push(`  localYOverride: ${localYOverride ? `[${localYOverride.map(v => v.toFixed(4)).join(', ')}]` : 'none (Global X default)'}`);
+    lines.push(`  Iy_local=${(sec.Iy / 1e6).toFixed(2)} ×10⁶mm⁴  Iz_local=${(sec.Iz / 1e6).toFixed(2)} ×10⁶mm⁴`);
+    lines.push(`  Iy_global(Y-load)=${(Iy_global / 1e6).toFixed(2)} ×10⁶mm⁴  Iz_global(X-load)=${(Iz_global / 1e6).toFixed(2)} ×10⁶mm⁴`);
+    lines.push(`  X-load δ: solver=${(dispX * 1e3).toFixed(4)} μm  expected=${(expectedDispX * 1e3).toFixed(4)} μm  err=${errX.toFixed(3)}%`);
+    lines.push(`  Y-load δ: solver=${(dispY * 1e3).toFixed(4)} μm  expected=${(expectedDispY * 1e3).toFixed(4)} μm  err=${errY.toFixed(3)}%`);
+    lines.push(`  δX/δY: solver=${isNaN(ratio) ? 'NaN' : ratio.toFixed(4)}  expected=${expectedRatio.toFixed(4)}  err=${ratioErr.toFixed(3)}%`);
+    const pass = errX < 0.5 && errY < 0.5 && ratioErr < 0.5;
+    lines.push(`  ${pass ? '✅ PASS' : '❌ FAIL'}\n`);
+  }
+
+  lines.push('--- Cross-check: 200×400@0° vs 200×400@90° should swap X↔Y stiffness ---');
+  lines.push('  (Case A and Case C must have inverted δX/δY ratios)');
+
+  return lines.join('\n');
+}

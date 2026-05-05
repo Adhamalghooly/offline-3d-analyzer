@@ -309,6 +309,7 @@ const Index = () => {
           isRemoved: removedColumnIds.includes(c.id) || removedColumnIds.includes(colId) || removedColumnIds.includes(legacyId),
           topEndCondition: colTopEndCondition as 'F' | 'P',
           bottomEndCondition: bottomEnd,
+          orientAngle: ov?.orientAngle ?? (c as any).orientAngle,
         });
         colSeq++;
       }
@@ -2137,7 +2138,7 @@ const Index = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                             {['العمود','X','Y','Z أسفل','Z أعلى','العرض','العمق','الارتفاع','الحالة','إزالة/استعادة','حذف'].map(h => (
+                             {['العمود','X','Y','Z أسفل','Z أعلى','العرض','العمق','الارتفاع','زاوية (°)','الحالة','إزالة/استعادة','حذف'].map(h => (
                                <TableHead key={h} className="text-xs">{h}</TableHead>
                              ))}
                           </TableRow>
@@ -2200,6 +2201,18 @@ const Index = () => {
                                       dispatch({ type: 'UPDATE_EXTRA_COLUMN', id: c.id, updates: { L: val } });
                                     } else {
                                       dispatch({ type: 'SET_COL_OVERRIDE', colId: c.id, override: { L: val } });
+                                    }
+                                  }} />
+                              </TableCell>
+                              <TableCell>
+                                <Input type="number" value={c.orientAngle ?? 0} className="h-8 w-16 font-mono text-xs"
+                                  title="زاوية توجيه المقطع: 0°=b على محور X، 90°=b على محور Y"
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    if (isExtra) {
+                                      dispatch({ type: 'UPDATE_EXTRA_COLUMN', id: c.id, updates: { orientAngle: val } });
+                                    } else {
+                                      dispatch({ type: 'SET_COL_OVERRIDE', colId: c.id, override: { orientAngle: val } });
                                     }
                                   }} />
                               </TableCell>
