@@ -74,7 +74,8 @@ import SlabLoadDiagnosticPanel from "@/components/SlabLoadDiagnosticPanel";
 import ETABSFullImportPanel from "@/components/ETABSFullImportPanel";
 import type { ETABSImportedData } from "@/components/ETABSFullImportPanel";
 import ETABSAnalysisImport from "@/components/ETABSAnalysisImport";
-import type { ETABSBeamResult } from "@/components/ETABSAnalysisImport";
+import type { ETABSBeamResult, ETABSColumnResult, ETABSReaction } from "@/components/ETABSAnalysisImport";
+import FoundationDesignPanel from "@/components/FoundationDesignPanel";
 
 const ParamInput = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
   <div className="space-y-1">
@@ -164,6 +165,13 @@ const Index = () => {
   const [designSource, setDesignSource] = React.useState<'app' | 'etabs'>('app');
   const [designExecuted, setDesignExecuted] = React.useState(false);
 
+  // Design tab: sub-tab state
+  const [designSubTab, setDesignSubTab] = React.useState<'beams_cols' | 'foundations'>('beams_cols');
+
+  // ETABS column results and reactions
+  const [etabsColumnResults, setEtabsColumnResults] = React.useState<ETABSColumnResult[]>([]);
+  const [etabsReactions, setEtabsReactions] = React.useState<ETABSReaction[]>([]);
+
   // Available elevations from stories
   const availableElevations = useMemo(() => {
     const elevs = new Set<number>();
@@ -202,10 +210,9 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    if (savedMessage) {
-      const t = setTimeout(() => dispatch({ type: 'CLEAR_SAVED_MESSAGE' }), 2000);
-      return () => clearTimeout(t);
-    }
+    if (!savedMessage) return;
+    const t = setTimeout(() => dispatch({ type: 'CLEAR_SAVED_MESSAGE' }), 2000);
+    return () => clearTimeout(t);
   }, [savedMessage]);
 
   // Keyboard shortcut: Ctrl+Z for undo
@@ -3349,11 +3356,15 @@ const Index = () => {
                   {/* ETABS import */}
                   {designSource === 'etabs' && (
                     <ETABSAnalysisImport
-                      appliedCount={etabsAnalysisData.length}
-                      onApply={(results) => {
+                      appliedBeamCount={etabsAnalysisData.length}
+                      appliedColCount={etabsColumnResults.length}
+                      appliedReactionCount={etabsReactions.length}
+                      onApplyBeams={(results) => {
                         dispatch({ type: 'SET_ETABS_ANALYSIS_DATA', data: results });
                         setDesignExecuted(false);
                       }}
+                      onApplyColumns={(cols) => setEtabsColumnResults(cols)}
+                      onApplyReactions={(reacts) => setEtabsReactions(reacts)}
                     />
                   )}
 
@@ -3375,6 +3386,44 @@ const Index = () => {
                 </CardContent>
               </Card>
 
+              {/* ── Design Sub-Tabs ── */}
+              <div className="flex gap-1 rounded-lg bg-muted p-1">
+                <button
+                  className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all ${
+                    designSubTab === 'beams_cols'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setDesignSubTab('beams_cols')}
+                >
+                  تصميم الجسور والأعمدة
+                </button>
+                <button
+                  className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all ${
+                    designSubTab === 'foundations'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setDesignSubTab('foundations')}
+                >
+                  تصميم الأساسات (WSM)
+                </button>
+              </div>
+
+              {/* ── Foundation Design Sub-Tab ── */}
+              {designSubTab === 'foundations' && (
+                <FoundationDesignPanel
+                  columns={columns}
+                  colDesigns={colDesigns}
+                  etabsReactions={etabsReactions.length > 0 ? etabsReactions : undefined}
+                  titleBlockConfig={titleBlockConfig}
+                  mat={mat}
+                />
+              )}
+
+              {/* ── Beams & Columns Design Sub-Tab ── */}
+              {designSubTab === 'beams_cols' && (
+              <>
               {/* ── Results (only after designExecuted) ── */}
               {!designExecuted ? (
                 <Card>
@@ -3473,6 +3522,53 @@ const Index = () => {
                           ))}
                           </React.Fragment>
                           );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                {/* ── As (mm²) Table ── */}
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">مساحة حديد التسليح المطلوبة As (mm²) - الجسور</CardTitle></CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <Table>
+                      <TableHeader><TableRow>
+                        {['الدور','الجسر','b×h','As يسار (mm²)','As وسط (mm²)','As يمين (mm²)','As_min (mm²)','ρ% يسار','ρ% وسط','ρ% يمين'].map(h => <TableHead key={h} className="text-xs whitespace-nowrap">{h}</TableHead>)}
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {stories.map(story =>
+                          (isAllStories || story.id === selectedStoryId) &&
+                          beamDesigns.filter(d => {
+                            const beam = beamsWithLoads.find(b => b.id === d.beamId);
+                            return beam?.storyId === story.id;
+                          }).map(d => {
+                            const beam = beamsWithLoads.find(b => b.id === d.beamId);
+                            const bw = beam?.b ?? 250;
+                            const hh = beam?.h ?? 500;
+                            const dEff = hh - 40 - 12;  // approx effective depth
+                            const As_min = Math.max(0.25 * Math.sqrt(mat.fc) / mat.fy * bw * dEff, 1.4 / mat.fy * bw * dEff);
+                            const AsL = d.flexLeft.As ?? (d.flexLeft.bars * Math.PI * d.flexLeft.dia ** 2 / 4);
+                            const AsMid = d.flexMid.As ?? (d.flexMid.bars * Math.PI * d.flexMid.dia ** 2 / 4);
+                            const AsR = d.flexRight.As ?? (d.flexRight.bars * Math.PI * d.flexRight.dia ** 2 / 4);
+                            const rhoL = (AsL / (bw * dEff) * 100);
+                            const rhoMid = (AsMid / (bw * dEff) * 100);
+                            const rhoR = (AsR / (bw * dEff) * 100);
+                            return (
+                              <TableRow key={`as-${story.id}-${d.beamId}`} className="cursor-pointer" onClick={() => handleSelectElement('beam', d.beamId)}>
+                                <TableCell className="text-xs text-muted-foreground">{story.label}</TableCell>
+                                <TableCell className="font-mono text-xs font-bold">{d.beamId}</TableCell>
+                                <TableCell className="font-mono text-xs">{bw}×{hh}</TableCell>
+                                <TableCell className="font-mono text-xs font-bold text-blue-700">{AsL.toFixed(0)}</TableCell>
+                                <TableCell className="font-mono text-xs font-bold text-green-700">{AsMid.toFixed(0)}</TableCell>
+                                <TableCell className="font-mono text-xs font-bold text-blue-700">{AsR.toFixed(0)}</TableCell>
+                                <TableCell className="font-mono text-xs text-amber-600">{As_min.toFixed(0)}</TableCell>
+                                <TableCell className={`font-mono text-xs ${rhoL > 2.5 ? 'text-destructive font-bold' : ''}`}>{rhoL.toFixed(2)}%</TableCell>
+                                <TableCell className={`font-mono text-xs ${rhoMid > 2.5 ? 'text-destructive font-bold' : ''}`}>{rhoMid.toFixed(2)}%</TableCell>
+                                <TableCell className={`font-mono text-xs ${rhoR > 2.5 ? 'text-destructive font-bold' : ''}`}>{rhoR.toFixed(2)}%</TableCell>
+                              </TableRow>
+                            );
                           })
                         )}
                       </TableBody>
@@ -3627,6 +3723,8 @@ const Index = () => {
                   </Card>
                 )}
               </div>
+              )}
+              </>
               )}
             </div>
           </TabsContent>
@@ -3823,6 +3921,21 @@ const Index = () => {
 
               {/* Additional quick export buttons */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">لوحة الأساسات</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-xs text-muted-foreground">صمّم الأساسات من تبويب التصميم ← تصميم الأساسات (WSM) ثم استخدم زر التصدير داخل اللوحة.</p>
+                    <Button
+                      className="w-full min-h-[44px] gap-2 bg-emerald-700 hover:bg-emerald-800 text-white"
+                      onClick={() => {
+                        dispatch({ type: 'SET_ACTIVE_TAB', tab: 'design' });
+                      }}
+                    >
+                      الذهاب إلى تصميم الأساسات
+                    </Button>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader><CardTitle className="text-sm">تقرير PDF</CardTitle></CardHeader>
                   <CardContent className="space-y-2">
