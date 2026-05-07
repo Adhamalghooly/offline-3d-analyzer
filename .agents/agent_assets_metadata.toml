@@ -59,3 +59,9 @@ id = "Rtsc63R0mgF4gXnXGmEeS"
 uri = "file://structural-master-v8.zip"
 type = "unspecified"
 title = "Structural Master v8 APK"
+
+[[outputs]]
+id = "7S--TKkl-CYCk8LVpiJb6"
+uri = "file://structural-master-capacitor.zip"
+type = "unspecified"
+title = "Structural Master APK (Capacitor) - جاهز للتثبيت"
