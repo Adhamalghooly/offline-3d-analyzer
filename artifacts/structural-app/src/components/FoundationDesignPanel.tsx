@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import {
   designFooting,
-  generateFoundationDrawingHTML,
   type ColumnReactionInput,
   type FootingMaterials,
   type FootingDesignResult,
@@ -43,10 +42,11 @@ interface ColLoadInput {
 
 interface Props {
   columns: Column[];
-  colDesigns: any[];          // from app analysis
-  etabsReactions?: ETABSReaction[];  // from ETABS import
+  colDesigns: any[];
+  etabsReactions?: ETABSReaction[];
   titleBlockConfig?: any;
   mat: { fc: number; fy: number };
+  onResultsChange?: (results: FootingDesignResult[], mat: FootingMaterials) => void;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -87,6 +87,7 @@ export default function FoundationDesignPanel({
   etabsReactions,
   titleBlockConfig,
   mat,
+  onResultsChange,
 }: Props) {
   // ── Material & soil inputs ─────────────────────────────────────────────────
   const [fc, setFc]   = useState(mat.fc || 21);
@@ -272,20 +273,7 @@ export default function FoundationDesignPanel({
     });
     setResults(res);
     setDesigned(true);
-  };
-
-  // ── Export drawing ─────────────────────────────────────────────────────────
-  const handleExportDrawing = () => {
-    if (results.length === 0) return;
-    const footingMat: FootingMaterials = { fc, fy, qa, cover, gamma_conc: gammaConc, gamma_soil: gammaSoil, Df };
-    const html = generateFoundationDrawingHTML(results, titleBlockConfig || {}, footingMat);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'foundation_plan.html';
-    a.click();
-    URL.revokeObjectURL(url);
+    onResultsChange?.(res, footingMat);
   };
 
   // ── Export results CSV ──────────────────────────────────────────────────────
@@ -493,9 +481,6 @@ export default function FoundationDesignPanel({
                 <div className="flex gap-1 mr-auto">
                   <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={handleExportCSV}>
                     <Download size={12} /> CSV
-                  </Button>
-                  <Button size="sm" className="h-8 text-xs gap-1 bg-emerald-700 hover:bg-emerald-800 text-white" onClick={handleExportDrawing}>
-                    <Download size={12} /> لوحة الأساسات (HTML)
                   </Button>
                 </div>
               </div>

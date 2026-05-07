@@ -13,6 +13,8 @@ import { generateStructuralDXF, generateBeamLayoutDXF, generateColumnLayoutDXF, 
 import { generateBBS, exportBBSToPDF, exportBBSToExcel } from '@/rebar/bbsGenerator';
 import { getFloorCode, makeDrawingNumber } from '@/drawings/drawingStandards';
 import type { ExportOptions, DevelopmentLengths } from '@/drawings/drawingStandards';
+import { generateFoundationDrawingHTML } from '@/lib/foundationDesign';
+import type { FootingDesignResult, FootingMaterials } from '@/lib/foundationDesign';
 
 
 
@@ -45,16 +47,20 @@ interface ExportPanelProps {
   projectName?: string;
   titleBlockConfig?: TitleBlockConfig;
   analyzed: boolean;
+  foundationResults?: FootingDesignResult[];
+  foundationMat?: FootingMaterials | null;
 }
 
 export default function ExportPanel({
   stories, slabs, beams, columns, beamDesigns, colDesigns, slabDesigns,
   mat, slabProps, projectName = 'Structural Design Studio', titleBlockConfig, analyzed,
+  foundationResults, foundationMat,
 }: ExportPanelProps) {
   const [selectedFloors, setSelectedFloors] = useState<string[]>(stories.map(s => s.id));
   const [drawingTypes, setDrawingTypes] = useState({
     beamLayout: true, columnLayout: true, slabPlan: true,
     generalNotes: true, bbs: true, beamElevation: true, buildingElevation: true,
+    foundationPlan: true,
   });
   const [format, setFormat] = useState<'pdf' | 'dxf' | 'both' | 'print'>('pdf');
   const [sheetSize, setSheetSize] = useState<'A3' | 'A4' | 'A1'>('A3');
@@ -187,6 +193,26 @@ export default function ExportPanel({
         }
       }
 
+      // Foundation plan (single drawing for entire building, independent of floors)
+      if (drawingTypes.foundationPlan && foundationResults && foundationResults.length > 0 && foundationMat) {
+        const tb = {
+          projectName: titleBlockConfig?.projectName || projectName,
+          firmName: titleBlockConfig?.firmName,
+          designedBy: titleBlockConfig?.designedBy,
+          checkedBy: titleBlockConfig?.checkedBy,
+          date: titleBlockConfig?.date,
+          drawingNumber: titleBlockConfig?.drawingNumber || 'F-01',
+        };
+        const html = generateFoundationDrawingHTML(foundationResults, tb, foundationMat);
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectName}_Foundation_Plan.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
       // Building elevation (once for all stories, not per-floor)
       if ((format === 'pdf' || format === 'both') && drawingTypes.buildingElevation) {
         // Building elevation uses ALL stories — generated via constructionSheets with all elements
@@ -266,6 +292,7 @@ export default function ExportPanel({
               ['bbs', 'جدول حصر الحديد (BBS)', 'حصر لكل دور + إجمالي المشروع'],
               ['beamElevation', 'مقطع طولي للجسور', 'رسم تفصيلي للتسليح الطولي والكانات'],
               ['buildingElevation', 'مقطع المبنى', 'القطاع الرأسي لكامل المبنى'],
+              ['foundationPlan', 'لوحة الأساسات (WSM)', 'مسقط الأساسات + قطاع نموذجي + جدول التصميم وفق ACI 318'],
             ] as [string, string, string][]).map(([key, label, desc]) => (
               <label key={key} className="flex items-center gap-2 text-[11px] cursor-pointer p-1 rounded hover:bg-muted/50" title={desc}>
                 <Checkbox

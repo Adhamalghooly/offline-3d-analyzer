@@ -76,6 +76,7 @@ import type { ETABSImportedData } from "@/components/ETABSFullImportPanel";
 import ETABSAnalysisImport from "@/components/ETABSAnalysisImport";
 import type { ETABSBeamResult, ETABSColumnResult, ETABSReaction } from "@/components/ETABSAnalysisImport";
 import FoundationDesignPanel from "@/components/FoundationDesignPanel";
+import type { FootingDesignResult, FootingMaterials } from "@/lib/foundationDesign";
 
 const ParamInput = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
   <div className="space-y-1">
@@ -167,6 +168,10 @@ const Index = () => {
 
   // Design tab: sub-tab state
   const [designSubTab, setDesignSubTab] = React.useState<'beams_cols' | 'foundations'>('beams_cols');
+
+  // Foundation design results (hoisted so ExportPanel can access them)
+  const [foundationResults, setFoundationResults] = React.useState<FootingDesignResult[]>([]);
+  const [foundationMat, setFoundationMat] = React.useState<FootingMaterials | null>(null);
 
   // ETABS column results and reactions
   const [etabsColumnResults, setEtabsColumnResults] = React.useState<ETABSColumnResult[]>([]);
@@ -3431,6 +3436,10 @@ const Index = () => {
                   etabsReactions={etabsReactions.length > 0 ? etabsReactions : undefined}
                   titleBlockConfig={titleBlockConfig}
                   mat={mat}
+                  onResultsChange={(res, mat) => {
+                    setFoundationResults(res);
+                    setFoundationMat(mat);
+                  }}
                 />
               )}
 
@@ -3930,25 +3939,12 @@ const Index = () => {
                 projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
                 titleBlockConfig={titleBlockConfig}
                 analyzed={analyzed}
+                foundationResults={foundationResults}
+                foundationMat={foundationMat}
               />
 
               {/* Additional quick export buttons */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader><CardTitle className="text-sm">لوحة الأساسات</CardTitle></CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-xs text-muted-foreground">صمّم الأساسات من تبويب التصميم ← تصميم الأساسات (WSM) ثم استخدم زر التصدير داخل اللوحة.</p>
-                    <Button
-                      className="w-full min-h-[44px] gap-2 bg-emerald-700 hover:bg-emerald-800 text-white"
-                      onClick={() => {
-                        dispatch({ type: 'SET_ACTIVE_TAB', tab: 'design' });
-                      }}
-                    >
-                      الذهاب إلى تصميم الأساسات
-                    </Button>
-                  </CardContent>
-                </Card>
-
                 <Card>
                   <CardHeader><CardTitle className="text-sm">تقرير PDF</CardTitle></CardHeader>
                   <CardContent className="space-y-2">
