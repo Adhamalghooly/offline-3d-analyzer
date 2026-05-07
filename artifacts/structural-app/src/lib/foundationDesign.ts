@@ -367,7 +367,7 @@ function buildTypePlanSVG(r: FootingDesignResult): string {
   <text x="${cx.toFixed(1)}" y="${(fy1 - 12).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="bold" fill="#880000">B</text>
   <text x="${cx.toFixed(1)}" y="${(fy2 + 18).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="bold" fill="#880000">B</text>`;
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
   ${svgDefs(id)}
   <rect width="${W}" height="${H}" fill="#f8f9fb"/>
   ${rebar}
@@ -416,7 +416,7 @@ function buildSectionASVG(r: FootingDesignResult, mat: FootingMaterials): string
     <text x="${(toRight ? x + 4 : x - 4).toFixed(1)}" y="${((y1 + y2) / 2 + 3).toFixed(1)}" text-anchor="${toRight ? 'start' : 'end'}" font-size="7" fill="#c00">${lbl}</text>`;
   }
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
   ${svgDefs(id)}
   <rect width="${W}" height="${H}" fill="#f8f9fb"/>
   <rect x="0" y="${GY.toFixed(1)}" width="${W}" height="${dfH.toFixed(1)}" fill="url(#soil${id})" opacity="0.7"/>
@@ -477,7 +477,7 @@ function buildSectionBSVG(r: FootingDesignResult, mat: FootingMaterials): string
     <text x="${(toRight ? x + 4 : x - 4).toFixed(1)}" y="${((y1 + y2) / 2 + 3).toFixed(1)}" text-anchor="${toRight ? 'start' : 'end'}" font-size="7" fill="#c00">${lbl}</text>`;
   }
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
   ${svgDefs(id)}
   <rect width="${W}" height="${H}" fill="#f8f9fb"/>
   <rect x="0" y="${GY.toFixed(1)}" width="${W}" height="${dfH.toFixed(1)}" fill="url(#soil${id})" opacity="0.7"/>
@@ -674,29 +674,31 @@ export function generateFoundationDrawingHTML(
   planElems += `<polygon points="${naX},${naY - 12} ${naX - 6},${naY + 8} ${naX},${naY + 3} ${naX + 6},${naY + 8}" fill="#1a3a5c" stroke="#1a3a5c" stroke-width="0.5"/>
     <text x="${naX}" y="${naY + 20}" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a3a5c">N</text>`;
 
-  // ── Per-type detail SVGs ──────────────────────────────────────────────────
+  // ── Per-type detail SVGs — use <table> for reliable layout in popup HTML ──
   const perTypeHTML = [...typeMap.values()].map(ft => {
     const r = ft.rep;
     return `
-    <div style="margin-bottom:12px;border:1px solid #c0cfe0;padding:6px;background:#fafbfc">
+    <div style="margin-bottom:14px;border:1px solid #c0cfe0;padding:6px 8px;background:#fafbfc;page-break-inside:avoid">
       <div style="font-size:9pt;font-weight:bold;color:#1a3a5c;margin-bottom:6px;border-bottom:1px solid #ddd;padding-bottom:3px">
         نوع ${ft.key} — ${ft.B}×${ft.L}×${ft.t} mm &nbsp;|&nbsp; أعمدة: ${ft.ids.join(', ')}
         &nbsp;|&nbsp; t<sub>min,ACI</sub> = ${ft.t_min_aci} mm
       </div>
-      <div style="display:grid;grid-template-columns:270px 255px 255px;gap:6px;align-items:start">
-        <div>
-          <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">مسقط أفقي (Plan View)</div>
-          ${buildTypePlanSVG(r)}
-        </div>
-        <div>
-          <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">قطاع أ—أ عبر B (Section A-A)</div>
-          ${buildSectionASVG(r, mat)}
-        </div>
-        <div>
-          <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">قطاع ب—ب عبر L (Section B-B)</div>
-          ${buildSectionBSVG(r, mat)}
-        </div>
-      </div>
+      <table style="border-collapse:collapse;width:100%">
+        <tr>
+          <td style="vertical-align:top;padding:0 6px 0 0;white-space:nowrap;border:none;background:transparent">
+            <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">مسقط أفقي (Plan View)</div>
+            ${buildTypePlanSVG(r)}
+          </td>
+          <td style="vertical-align:top;padding:0 6px;white-space:nowrap;border:none;background:transparent">
+            <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">قطاع أ—أ عبر B (Section A-A)</div>
+            ${buildSectionASVG(r, mat)}
+          </td>
+          <td style="vertical-align:top;padding:0;white-space:nowrap;border:none;background:transparent">
+            <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">قطاع ب—ب عبر L (Section B-B)</div>
+            ${buildSectionBSVG(r, mat)}
+          </td>
+        </tr>
+      </table>
     </div>`;
   }).join('');
 
@@ -750,7 +752,7 @@ export function generateFoundationDrawingHTML(
   .draw-row{display:grid;grid-template-columns:55fr 45fr;gap:8px;margin-bottom:8px}
   .draw-box{border:1px solid #ccc;padding:4px;background:#fafbfc}
   .draw-box h3{font-size:8pt;color:#1a3a5c;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid #ddd}
-  svg{display:block;width:100%}
+  svg.plan-svg{display:block;width:100%}
   /* ─── Tables ─── */
   table{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:8px}
   th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:center;border:1px solid #1a3a5c}
@@ -801,7 +803,7 @@ export function generateFoundationDrawingHTML(
 <!-- ══════════════ GLOBAL FOUNDATION PLAN ══════════════ -->
 <div class="sec-hdr">مسقط الأساسات — Foundation Plan</div>
 <div class="draw-box" style="margin-bottom:8px">
-  <svg viewBox="0 0 ${PLAN_W} ${PLAN_H}" xmlns="http://www.w3.org/2000/svg">
+  <svg class="plan-svg" viewBox="0 0 ${PLAN_W} ${PLAN_H}" xmlns="http://www.w3.org/2000/svg">
     ${markers}
     <rect width="${PLAN_W}" height="${PLAN_H}" fill="#f8f9fb"/>
     ${planElems}
