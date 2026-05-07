@@ -235,52 +235,56 @@ function htmlSheetBorder(): string {
 
 // ─── Schedule tables (Arabic headers) ───
 
+function fmtRebar(bars: number, dia: number): string { return `${bars}Φ${dia}`; }
+
 function htmlBeamScheduleTable(beams: Beam[], beamDesigns: BeamDesignData[]): string {
-  const formatRebar = (bars: number, dia: number) => `${bars}@${dia}mm`;
-  
   let rows = '';
   for (const d of beamDesigns) {
     const beam = beams.find(b => b.id === d.beamId);
+    const spanM = beam?.length ?? 999;
     const totalBot = d.flexMid.bars;
-    const hasBent = totalBot >= 4;
+    // No curtailment for beams ≤ 2 m — all bottom bars run full span
+    const isShort = spanM <= 2.0;
+    const hasBent = !isShort && totalBot >= 4;
     const bentCount = hasBent ? Math.min(2, Math.floor(totalBot / 2)) : 0;
     const straightBot = totalBot - bentCount;
-    const topBars = Math.max(d.flexLeft.bars, d.flexRight.bars);
-    const topDia = Math.max(d.flexLeft.dia, d.flexRight.dia);
-    
+
     rows += `<tr>
       <td>${d.beamId}</td>
       <td>${beam?.b ?? ''}</td>
       <td>${beam?.h ?? ''}</td>
-      <td>${formatRebar(straightBot, d.flexMid.dia)}</td>
-      <td>${bentCount > 0 ? formatRebar(bentCount, d.flexMid.dia) : '—'}</td>
-      <td>${formatRebar(topBars, topDia)}</td>
-      <td>${bentCount > 0 ? formatRebar(bentCount, d.flexMid.dia) : '—'}</td>
+      <td>${(spanM < 900 ? spanM.toFixed(2) : '—')}</td>
+      <td>${fmtRebar(straightBot, d.flexMid.dia)}</td>
+      <td>${bentCount > 0 ? fmtRebar(bentCount, d.flexMid.dia) : '—'}</td>
+      <td>${d.flexLeft.bars > 0 ? fmtRebar(d.flexLeft.bars, d.flexLeft.dia) : '—'}</td>
+      <td>${d.flexRight.bars > 0 ? fmtRebar(d.flexRight.bars, d.flexRight.dia) : '—'}</td>
       <td>${d.shear.stirrups}</td>
     </tr>`;
   }
 
   return `
   <div style="font-weight:bold; font-size:11px; margin-bottom:4px; font-family:Arial;">BEAM SCHEDULE / جدول الجسور</div>
-  <table style="width:100%; border-collapse:collapse; font-size:9px; font-family:'Segoe UI',Arial,Tahoma,sans-serif;">
+  <table style="width:100%; border-collapse:collapse; font-size:8.5px; font-family:'Segoe UI',Arial,Tahoma,sans-serif;">
     <thead>
       <tr>
-        <th rowspan="2" style="border:1px solid #000; background:#000; color:#fff; padding:3px;">الجسر</th>
-        <th rowspan="2" style="border:1px solid #000; background:#000; color:#fff; padding:3px;">B mm</th>
-        <th rowspan="2" style="border:1px solid #000; background:#000; color:#fff; padding:3px;">H mm</th>
-        <th colspan="2" style="border:1px solid #000; background:#000; color:#fff; padding:3px;">التسليح السفلي</th>
-        <th colspan="2" style="border:1px solid #000; background:#000; color:#fff; padding:3px;">التسليح العلوي</th>
-        <th rowspan="2" style="border:1px solid #000; background:#000; color:#fff; padding:3px;">الكانات</th>
+        <th rowspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">الجسر</th>
+        <th rowspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">B</th>
+        <th rowspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">H</th>
+        <th rowspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">L (m)</th>
+        <th colspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">سفلي</th>
+        <th colspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">علوي</th>
+        <th rowspan="2" style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">الكانات</th>
       </tr>
       <tr>
-        <th style="border:1px solid #000; background:#000; color:#fff; padding:2px; font-size:8px;">مستقيم</th>
-        <th style="border:1px solid #000; background:#000; color:#fff; padding:2px; font-size:8px;">مكسح</th>
-        <th style="border:1px solid #000; background:#000; color:#fff; padding:2px; font-size:8px;">مستقيم</th>
-        <th style="border:1px solid #000; background:#000; color:#fff; padding:2px; font-size:8px;">مكسح</th>
+        <th style="border:1px solid #000; background:#2a4a6c; color:#fff; padding:2px; font-size:7.5px;">مستقيم</th>
+        <th style="border:1px solid #000; background:#2a4a6c; color:#fff; padding:2px; font-size:7.5px;">مكسح*</th>
+        <th style="border:1px solid #000; background:#2a4a6c; color:#fff; padding:2px; font-size:7.5px;">يسار</th>
+        <th style="border:1px solid #000; background:#2a4a6c; color:#fff; padding:2px; font-size:7.5px;">يمين</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
-  </table>`;
+  </table>
+  <div style="font-size:7.5px; color:#555; margin-top:3px;">* التكسيح للجسور L > 2.0 م فقط — الجسور القصيرة: حديد سفلي مستمر كامل الطول</div>`;
 }
 
 function htmlColumnScheduleTable(colDesigns: ColDesignData[]): string {
@@ -290,7 +294,7 @@ function htmlColumnScheduleTable(colDesigns: ColDesignData[]): string {
       <td>${c.id}</td>
       <td>${c.b}</td>
       <td>${c.h}</td>
-      <td>${c.design.bars}@${c.design.dia}mm</td>
+      <td>${fmtRebar(c.design.bars, c.design.dia)}</td>
       <td>${c.design.stirrups}</td>
     </tr>`;
   }
@@ -393,7 +397,7 @@ function svgColumnCrossSection(cd: ColDesignData, x: number, y: number, w: numbe
   
   // Label
   svg += `<text x="${x + 5}" y="${y + 12}" font-size="7" font-weight="bold" font-family="Arial">${cd.id}</text>`;
-  svg += `<text x="${x + 5}" y="${y + 22}" font-size="6" font-family="Arial">${cd.b}×${cd.h}  ${cd.design.bars}@${cd.design.dia}mm</text>`;
+  svg += `<text x="${x + 5}" y="${y + 22}" font-size="6" font-family="Arial">${cd.b}×${cd.h}mm  ${fmtRebar(cd.design.bars, cd.design.dia)}</text>`;
   svg += `<text x="${x + 5}" y="${ry + rectH + 16}" font-size="6" font-family="Arial">${cd.design.stirrups}</text>`;
   
   return svg;
@@ -419,33 +423,270 @@ function generateSheetHTML(
   const tableZoneX = 756; // right side for tables
   const tableZoneW = 460;
 
+  // Title block occupies bottom-right: height=135px, bottom=36px → top of title block = sheetH-36-135 = 720px
+  // Safe content zone ends at 715px (5px clearance above title block)
+  const safeBottom = sheetH - 36 - 135 - 10; // = 715px
+  const contentH = safeBottom - 45; // from top=45px → 670px
+
   return `
   <div class="sheet-page" style="position:relative; width:${sheetW}px; height:${sheetH}px; background:white; overflow:hidden; page-break-after:always; font-family:'Segoe UI',Arial,Tahoma,sans-serif;">
     ${htmlSheetBorder()}
     
-    <!-- Drawing Zone -->
-    <div style="position:absolute; top:45px; left:45px; width:${drawZoneW}px; height:${drawZoneH}px; border:0.5px solid #ccc;">
-      <svg viewBox="0 0 ${svgDrawW} ${svgDrawH}" width="${drawZoneW}" height="${drawZoneH}" xmlns="http://www.w3.org/2000/svg">
+    <!-- Drawing Zone — hard height enforced, no overflow -->
+    <div style="position:absolute; top:45px; left:45px; width:${drawZoneW}px; height:${contentH}px; overflow:hidden; border:0.5px solid #ccc;">
+      <svg viewBox="0 0 ${svgDrawW} ${svgDrawH}" width="${drawZoneW}" height="${contentH}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
         ${svgDrawingZone}
       </svg>
     </div>
     
-    <!-- Table Zone -->
-    <div style="position:absolute; top:45px; left:${tableZoneX}px; width:${tableZoneW}px; max-height:${drawZoneH}px; overflow:hidden; direction:rtl;">
+    <!-- Table Zone — hard height enforced, never reaches title block -->
+    <div style="position:absolute; top:45px; left:${tableZoneX}px; width:${tableZoneW}px; height:${contentH}px; overflow:hidden; direction:rtl;">
       ${tableContent}
-    </div>
-    
-    <!-- Legend (bottom left) -->
-    <div style="position:absolute; bottom:190px; left:45px;">
-      <svg width="170" height="120" xmlns="http://www.w3.org/2000/svg">
-        ${svgLegendBox(0, 0)}
-      </svg>
     </div>
     
     ${extraSvgBottom || ''}
     
     <!-- Title Block -->
     ${htmlTitleBlock(titleBlockConfig)}
+  </div>`;
+}
+
+// ─── Beam Elevation Sheet (HTML) ─── 
+
+function svgSingleBeamElevation(
+  beam: Beam, design: BeamDesignData,
+  ox: number, oy: number, zoneW: number, zoneH: number,
+): string {
+  const spanM = beam.length;
+  const isShort = spanM <= 2.0;
+  const scl = (zoneW - 36) / spanM;
+  const bh = Math.min(zoneH - 48, Math.max(24, (beam.h / 1000) * scl * 2.5));
+  const bx = ox + 18;
+  const by = oy + 22;
+  const bw = spanM * scl;
+  const cover = 4;
+
+  const totalBot = design.flexMid.bars;
+  const bentCount = (!isShort && totalBot >= 4) ? Math.min(2, Math.floor(totalBot / 2)) : 0;
+  const straightBot = totalBot - bentCount;
+
+  const stirMatch = design.shear.stirrups.match(/(\d+)Φ(\d+)@(\d+)/);
+  const stirSpacing = stirMatch ? parseInt(stirMatch[3]) : 200;
+  const nStirs = Math.min(30, Math.ceil((spanM * 1000) / stirSpacing));
+
+  let s = '';
+  // Beam body
+  s += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="#f0f8f0" stroke="#333" stroke-width="1.2"/>`;
+  // Column stubs at supports
+  const colW = Math.min(20, bw * 0.12);
+  s += `<rect x="${bx - colW}" y="${by - 8}" width="${colW}" height="${bh + 16}" fill="#ccc" stroke="#555" stroke-width="1"/>`;
+  s += `<rect x="${bx + bw}" y="${by - 8}" width="${colW}" height="${bh + 16}" fill="#ccc" stroke="#555" stroke-width="1"/>`;
+  // Stirrups
+  for (let i = 1; i < nStirs; i++) {
+    const sx = bx + (i / nStirs) * bw;
+    s += `<line x1="${sx}" y1="${by + 2}" x2="${sx}" y2="${by + bh - 2}" stroke="#aaa" stroke-width="0.5"/>`;
+  }
+  // Bottom straight bars
+  const botY = by + bh - cover - 2;
+  s += `<line x1="${bx + 2}" y1="${botY}" x2="${bx + bw - 2}" y2="${botY}" stroke="#1a56db" stroke-width="${Math.max(1.5, straightBot * 0.7)}" stroke-linecap="round"/>`;
+  s += `<text x="${bx + bw / 2}" y="${botY + 9}" text-anchor="middle" font-size="7" fill="#1a56db" font-family="Arial">${straightBot > 0 ? fmtRebar(straightBot, design.flexMid.dia) : ''}</text>`;
+  // Bent-up bars (only for L > 2m)
+  if (bentCount > 0) {
+    const b1 = bw * 0.22; const b2 = bw * 0.42;
+    s += `<polyline points="${bx + b1},${botY} ${bx + b2},${by + cover + 2}" fill="none" stroke="#c44" stroke-width="1.2"/>`;
+    s += `<line x1="${bx}" y1="${by + cover + 2}" x2="${bx + b2}" y2="${by + cover + 2}" stroke="#c44" stroke-width="1.2"/>`;
+    const b3 = bw * 0.58; const b4 = bw * 0.78;
+    s += `<polyline points="${bx + b4},${botY} ${bx + b3},${by + cover + 2}" fill="none" stroke="#c44" stroke-width="1.2"/>`;
+    s += `<line x1="${bx + b3}" y1="${by + cover + 2}" x2="${bx + bw}" y2="${by + cover + 2}" stroke="#c44" stroke-width="1.2"/>`;
+    s += `<text x="${bx + bw / 2}" y="${by + cover - 2}" text-anchor="middle" font-size="6.5" fill="#c44" font-family="Arial">${fmtRebar(bentCount, design.flexMid.dia)} مكسح</text>`;
+  }
+  // Top bars left
+  const topY = by + cover + 2;
+  const leftExt = Math.min(bw * 0.38, bw - 10);
+  if (design.flexLeft.bars > 0) {
+    s += `<line x1="${bx}" y1="${topY}" x2="${bx + leftExt}" y2="${topY}" stroke="#8b0000" stroke-width="${Math.max(1.5, design.flexLeft.bars * 0.6)}" stroke-linecap="round"/>`;
+    s += `<text x="${bx + leftExt / 2}" y="${topY - 3}" text-anchor="middle" font-size="7" fill="#8b0000" font-family="Arial">${fmtRebar(design.flexLeft.bars, design.flexLeft.dia)}</text>`;
+  }
+  // Top bars right
+  const rightExt = Math.min(bw * 0.38, bw - 10);
+  if (design.flexRight.bars > 0) {
+    s += `<line x1="${bx + bw - rightExt}" y1="${topY}" x2="${bx + bw}" y2="${topY}" stroke="#8b0000" stroke-width="${Math.max(1.5, design.flexRight.bars * 0.6)}" stroke-linecap="round"/>`;
+    s += `<text x="${bx + bw - rightExt / 2}" y="${topY - 3}" text-anchor="middle" font-size="7" fill="#8b0000" font-family="Arial">${fmtRebar(design.flexRight.bars, design.flexRight.dia)}</text>`;
+  }
+  // Labels
+  s += `<text x="${bx}" y="${oy + 12}" font-size="8" font-weight="bold" fill="#000" font-family="Arial">${beam.id}  ${beam.b}×${beam.h}mm</text>`;
+  // Span dimension
+  s += `<line x1="${bx}" y1="${by + bh + 6}" x2="${bx + bw}" y2="${by + bh + 6}" stroke="#666" stroke-width="0.8"/>`;
+  s += `<line x1="${bx}" y1="${by + bh + 2}" x2="${bx}" y2="${by + bh + 10}" stroke="#666" stroke-width="0.8"/>`;
+  s += `<line x1="${bx + bw}" y1="${by + bh + 2}" x2="${bx + bw}" y2="${by + bh + 10}" stroke="#666" stroke-width="0.8"/>`;
+  s += `<text x="${bx + bw / 2}" y="${by + bh + 18}" text-anchor="middle" font-size="7" fill="#555" font-family="Arial">L = ${spanM.toFixed(2)} m${isShort ? '  ← حديد سفلي مستمر كامل' : ''}</text>`;
+  return s;
+}
+
+function htmlBeamElevationSheet(
+  beams: Beam[], beamDesigns: BeamDesignData[],
+  tbBase: Partial<TitleBlockConfig>, floorCode: string, startSheetNo: number,
+): string {
+  const sheetW = 1260, sheetH = 891;
+  const titleH = 135 + 36 + 10;
+  const contentH = sheetH - 45 - titleH;
+  const cols = 2, rows = 3;
+  const cellW = Math.floor((sheetW - 90) / cols);
+  const cellH = Math.floor(contentH / rows);
+
+  let sheets = '';
+  let sheetNo = startSheetNo;
+  const perPage = cols * rows;
+
+  for (let p = 0; p < beamDesigns.length; p += perPage) {
+    const chunk = beamDesigns.slice(p, p + perPage);
+    let svgContent = '';
+    chunk.forEach((d, i) => {
+      const beam = beams.find(b => b.id === d.beamId);
+      if (!beam) return;
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const ox = 45 + col * cellW;
+      const oy = row * cellH;
+      svgContent += `<rect x="${ox}" y="${oy}" width="${cellW - 4}" height="${cellH - 4}" fill="none" stroke="#ddd" stroke-width="0.5"/>`;
+      svgContent += svgSingleBeamElevation(beam, d, ox, oy, cellW - 4, cellH - 4);
+    });
+
+    const svgZone = `<svg viewBox="0 0 ${sheetW - 90} ${contentH}" width="${sheetW - 90}" height="${contentH}" xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`;
+    sheets += `
+  <div class="sheet-page" style="position:relative; width:${sheetW}px; height:${sheetH}px; background:white; overflow:hidden; page-break-after:always; font-family:'Segoe UI',Arial,Tahoma,sans-serif;">
+    ${htmlSheetBorder()}
+    <div style="position:absolute; top:42px; left:45px; right:45px; height:${contentH}px; overflow:hidden; border:0.5px solid #ccc;">
+      ${svgZone}
+    </div>
+    <!-- Legend colour key -->
+    <div style="position:absolute; bottom:${titleH - 10}px; left:50px; font-size:7.5px; color:#333; font-family:Arial;">
+      <span style="color:#8b0000;">━━</span> حديد علوي (لحظة سالبة) &nbsp;
+      <span style="color:#1a56db;">━━</span> حديد سفلي مستقيم &nbsp;
+      <span style="color:#c44;">━━</span> حديد مكسح (L>2م فقط)
+    </div>
+    ${htmlTitleBlock({ ...tbBase, drawingTitle: 'BEAM ELEVATION / المقطع الطولي للجسور', drawingSubTitle: tbBase.drawingSubTitle || 'All Floors', drawingNumber: makeDrawingNumber(floorCode, 'BE', p / perPage + 1), sheetNo: sheetNo.toString(), scale: 'N.T.S.' })}
+  </div>`;
+    sheetNo++;
+  }
+  return sheets;
+}
+
+// ─── BBS HTML Sheet ───
+
+function htmlBBSSheet(
+  beams: Beam[], beamDesigns: BeamDesignData[], colDesigns: ColDesignData[], slabDesigns: SlabDesignData[],
+  tbBase: Partial<TitleBlockConfig>, floorCode: string, startSheetNo: number,
+): string {
+  // Build entries inline (simplified weights)
+  const barW = (dia: number, lenM: number) => (dia * dia / 162.2) * lenM;
+  const hook = (dia: number) => Math.max(12 * dia / 1000, 0.15);
+
+  interface SimpleEntry { mark: string; member: string; type: string; dia: number; len: number; qty: number; wt: number; }
+  const entries: SimpleEntry[] = [];
+  let mk = 1;
+
+  for (const d of beamDesigns) {
+    const beam = beams.find(b => b.id === d.beamId);
+    if (!beam) continue;
+    const L = beam.length;
+    const isShort = L <= 2.0;
+    const totalBot = d.flexMid.bars;
+    const bentCount = (!isShort && totalBot >= 4) ? Math.min(2, Math.floor(totalBot / 2)) : 0;
+    const straightBot = totalBot - bentCount;
+    const topLenL = L * 0.30 + hook(d.flexLeft.dia);
+    const topLenR = L * 0.30 + hook(d.flexRight.dia);
+    const botLen = L + 2 * hook(d.flexMid.dia);
+    entries.push({ mark: `T${mk}L`, member: d.beamId, type: 'جسر-علوي', dia: d.flexLeft.dia, len: parseFloat(topLenL.toFixed(2)), qty: d.flexLeft.bars, wt: parseFloat((barW(d.flexLeft.dia, d.flexLeft.bars * topLenL) * 1.05).toFixed(1)) });
+    entries.push({ mark: `T${mk}R`, member: d.beamId, type: 'جسر-علوي', dia: d.flexRight.dia, len: parseFloat(topLenR.toFixed(2)), qty: d.flexRight.bars, wt: parseFloat((barW(d.flexRight.dia, d.flexRight.bars * topLenR) * 1.05).toFixed(1)) });
+    entries.push({ mark: `B${mk}`, member: d.beamId, type: 'جسر-سفلي', dia: d.flexMid.dia, len: parseFloat(botLen.toFixed(2)), qty: straightBot, wt: parseFloat((barW(d.flexMid.dia, straightBot * botLen) * 1.05).toFixed(1)) });
+    if (bentCount > 0) {
+      const bL = L * 0.6 + 2 * hook(d.flexMid.dia);
+      entries.push({ mark: `BK${mk}`, member: d.beamId, type: 'جسر-مكسح', dia: d.flexMid.dia, len: parseFloat(bL.toFixed(2)), qty: bentCount, wt: parseFloat((barW(d.flexMid.dia, bentCount * bL) * 1.05).toFixed(1)) });
+    }
+    const sm = d.shear.stirrups.match(/(\d+)Φ(\d+)@(\d+)/);
+    if (sm) {
+      const sDia = parseInt(sm[2]); const sSp = parseInt(sm[3]);
+      const nS = Math.ceil((L * 1000) / sSp);
+      const sLen = parseFloat((2 * ((beam.b - 80) / 1000 + (beam.h - 80) / 1000) + 2 * hook(sDia)).toFixed(2));
+      entries.push({ mark: `S${mk}`, member: d.beamId, type: 'كانات-جسر', dia: sDia, len: sLen, qty: nS, wt: parseFloat((barW(sDia, nS * sLen) * 1.05).toFixed(1)) });
+    }
+    mk++;
+  }
+  for (const c of colDesigns) {
+    const lap = 40 * c.design.dia / 1000;
+    const len = parseFloat((3.0 + lap).toFixed(2));
+    entries.push({ mark: `C${mk}`, member: c.id, type: 'عمود', dia: c.design.dia, len, qty: c.design.bars, wt: parseFloat((barW(c.design.dia, c.design.bars * len) * 1.03).toFixed(1)) });
+    mk++;
+  }
+  for (const s of slabDesigns) {
+    entries.push({ mark: `SL${mk}S`, member: s.id, type: 'بلاطة', dia: s.design.shortDir.dia, len: parseFloat((s.design.lx + 0.3).toFixed(2)), qty: Math.ceil(s.design.ly * 1000 / s.design.shortDir.spacing), wt: 0 });
+    entries.push({ mark: `SL${mk}L`, member: s.id, type: 'بلاطة', dia: s.design.longDir.dia, len: parseFloat((s.design.ly + 0.3).toFixed(2)), qty: Math.ceil(s.design.lx * 1000 / s.design.longDir.spacing), wt: 0 });
+    mk++;
+  }
+
+  const totalWt = entries.reduce((s, e) => s + e.wt, 0);
+  const diaSummary = new Map<number, number>();
+  for (const e of entries) diaSummary.set(e.dia, (diaSummary.get(e.dia) || 0) + e.wt);
+
+  let tableRows = entries.map(e =>
+    `<tr><td>${e.mark}</td><td>${e.member}</td><td>${e.type}</td><td>Φ${e.dia}</td><td>${e.len.toFixed(2)}</td><td>${e.qty}</td><td>${(e.qty * e.len).toFixed(2)}</td><td>${e.wt.toFixed(1)}</td></tr>`
+  ).join('');
+
+  let sumRows = [...diaSummary.entries()].sort((a, b) => a[0] - b[0]).map(([d, w]) =>
+    `<tr><td>Φ${d}</td><td>${w.toFixed(1)} kg</td></tr>`
+  ).join('');
+
+  const sheetW = 1260, sheetH = 891;
+  const titleH = 135 + 36 + 10;
+  const contentH = sheetH - 45 - titleH;
+
+  return `
+  <div class="sheet-page" style="position:relative; width:${sheetW}px; height:${sheetH}px; background:white; overflow:hidden; page-break-after:always; font-family:'Segoe UI',Arial,Tahoma,sans-serif;">
+    ${htmlSheetBorder()}
+    <div style="position:absolute; top:45px; left:45px; right:45px; height:${contentH}px; overflow:hidden; direction:rtl; padding:6px;">
+      <div style="font-size:13px; font-weight:bold; border-bottom:2px solid #1a3a5c; padding-bottom:4px; margin-bottom:6px; color:#1a3a5c;">جدول حصر الحديد — BAR BENDING SCHEDULE</div>
+      <div style="display:flex; gap:16px; height:calc(100% - 30px); overflow:hidden;">
+        <div style="flex:1; overflow:hidden;">
+          <table style="width:100%; border-collapse:collapse; font-size:8px; font-family:'Segoe UI',Arial,Tahoma,sans-serif;">
+            <thead>
+              <tr>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">الرقم</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">العنصر</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">النوع</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">القطر</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">الطول (م)</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">العدد</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">إجمالي طول (م)</th>
+                <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">الوزن (كغ)</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+            <tfoot>
+              <tr><td colspan="7" style="border:1px solid #000; background:#eee; font-weight:bold; padding:3px; text-align:right;">إجمالي الوزن</td>
+              <td style="border:1px solid #000; background:#eee; font-weight:bold; padding:3px;">${totalWt.toFixed(1)}</td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <div style="width:160px; flex-shrink:0;">
+          <div style="font-weight:bold; font-size:9px; margin-bottom:4px; color:#1a3a5c;">ملخص بحسب القطر</div>
+          <table style="width:100%; border-collapse:collapse; font-size:8px;">
+            <thead><tr>
+              <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">القطر</th>
+              <th style="border:1px solid #000; background:#1a3a5c; color:#fff; padding:3px;">الوزن (كغ)</th>
+            </tr></thead>
+            <tbody>${sumRows}</tbody>
+          </table>
+          <div style="margin-top:10px; font-size:7.5px; color:#555; line-height:1.6;">
+            <div>• الأوزان تشمل هدر 5% للجسور</div>
+            <div>• 3% للأعمدة، 8% للبلاطات</div>
+            <div>• الطول بالمتر، الوزن بالكيلوغرام</div>
+            <div>• حديد التسليح: fy=${tbBase.fy || 420} MPa</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${htmlTitleBlock({ ...tbBase, drawingTitle: 'BAR BENDING SCHEDULE / جدول حصر الحديد', drawingSubTitle: tbBase.drawingSubTitle || 'All Floors', drawingNumber: makeDrawingNumber(floorCode, 'BBS', 1), sheetNo: startSheetNo.toString(), scale: 'N.T.S.' })}
   </div>`;
 }
 
@@ -641,7 +882,7 @@ export function generateHTMLConstructionSheets(
   <div class="sheet-page" style="position:relative; width:1260px; height:891px; background:white; overflow:hidden; page-break-after:always; font-family:'Segoe UI',Arial,Tahoma,sans-serif; direction:rtl;">
     ${htmlSheetBorder()}
     
-    <div style="position:absolute; top:50px; left:50px; right:50px; bottom:200px; padding:10px;">
+    <div style="position:absolute; top:45px; left:45px; right:45px; height:670px; overflow:hidden; padding:10px;">
       <h2 style="text-align:center; font-size:16px; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:12px;">ملاحظات عامة — GENERAL NOTES</h2>
       
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:10px;">
@@ -709,6 +950,21 @@ export function generateHTMLConstructionSheets(
   </div>`;
 
   sheetsHTML += generalNotesHTML;
+
+  // ═══════════════════════════════════════════════════
+  // SHEET 5: BEAM ELEVATION (longitudinal section)
+  // ═══════════════════════════════════════════════════
+  if (beamDesigns.length > 0) {
+    sheetsHTML += htmlBeamElevationSheet(beams, beamDesigns, { ...tbBase, drawingSubTitle: storyLabel || 'All Floors' }, floorCode, 5);
+  }
+
+  // ═══════════════════════════════════════════════════
+  // SHEET 6+: BBS (Bar Bending Schedule)
+  // ═══════════════════════════════════════════════════
+  if (beamDesigns.length > 0 || colDesigns.length > 0) {
+    const bbsSheetNo = 5 + (beamDesigns.length > 0 ? Math.ceil(beamDesigns.length / 6) : 0) + 1;
+    sheetsHTML += htmlBBSSheet(beams, beamDesigns, colDesigns, slabDesigns, { ...tbBase, drawingSubTitle: storyLabel || 'All Floors' }, floorCode, bbsSheetNo);
+  }
 
   // Wrap everything in a printable HTML document
   return `<!DOCTYPE html>

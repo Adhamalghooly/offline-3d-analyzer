@@ -73,7 +73,7 @@ export const LINE_WEIGHTS = {
 // =================== DRAWING NUMBER SYSTEM ===================
 
 export type FloorCode = 'B1' | 'GF' | '1F' | '2F' | '3F' | '4F' | '5F' | '6F' | '7F' | '8F' | '9F' | 'RF' | 'FD';
-export type TypeCode = 'PL' | 'SE' | 'CS' | 'BS' | 'SL' | 'EL' | 'BBS' | 'NT';
+export type TypeCode = 'PL' | 'SE' | 'CS' | 'BS' | 'SL' | 'EL' | 'BBS' | 'NT' | 'BE';
 
 export function getFloorCode(storyLabel: string, storyIndex: number): string {
   const label = storyLabel.toLowerCase();

@@ -174,8 +174,8 @@ export default function ExportPanel({
             }
           }
 
-          // BBS per floor
-          if (drawingTypes.bbs) {
+          // BBS per floor — skip PDF download in print mode (BBS is embedded in HTML sheets)
+          if (drawingTypes.bbs && format !== 'print') {
             const bbs = generateBBS(filtBeams, filtCols, filtSlabs, filtBeamDesigns, filtColDesigns, filtSlabDesigns);
             exportBBSToPDF(bbs, `${projectName}_BBS_${floorCode}`);
           }
@@ -204,13 +204,20 @@ export default function ExportPanel({
           drawingNumber: titleBlockConfig?.drawingNumber || 'F-01',
         };
         const html = generateFoundationDrawingHTML(foundationResults, tb, foundationMat);
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${projectName}_Foundation_Plan.html`;
-        a.click();
-        URL.revokeObjectURL(url);
+        if (format === 'print') {
+          // Open in print window alongside other sheets
+          import('@/lib/capacitorDownload').then(({ openHTMLForPrint }) =>
+            openHTMLForPrint(html)
+          );
+        } else {
+          const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${projectName}_Foundation_Plan.html`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
       }
 
       // Building elevation (once for all stories, not per-floor)
