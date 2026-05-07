@@ -559,12 +559,14 @@ export default function FoundationDesignPanel({
                                 <p>As_y_use = {r.As_y_use.toFixed(0)} mm²/m</p>
                               </div>
                               <div className="space-y-1">
-                                <p className="font-bold text-xs">ثوابت WSM</p>
-                                <p>fc_allow = {r.fc_allow.toFixed(1)} MPa</p>
-                                <p>fs_allow = {r.fs_allow.toFixed(0)} MPa</p>
-                                <p>n = {r.n}</p>
-                                <p>k = {r.k.toFixed(3)}</p>
-                                <p>j = {r.j.toFixed(3)}</p>
+                                <p className="font-bold text-xs">ثوابت WSM (ACI 318 App.B)</p>
+                                <p className="text-amber-700">fc_allow = 0.45×f'c = {r.fc_allow.toFixed(1)} MPa</p>
+                                <p className="text-amber-700">fs_allow = min(0.5fy,207) = {r.fs_allow.toFixed(0)} MPa</p>
+                                <p>n = Es/Ec = {r.n}</p>
+                                <p>k = {r.k.toFixed(3)} , j = {r.j.toFixed(3)}</p>
+                                <p className="font-bold text-xs mt-1">السُّمك الأدنى</p>
+                                <p>t_min (ACI §13.3) = {r.t_min_aci} mm</p>
+                                <p>t مختار = {r.t} mm</p>
                                 <p className="font-bold text-xs mt-1">القص</p>
                                 <p>Vu_wide = {r.Vu_wide.toFixed(1)} kN</p>
                                 <p>Vc_wide = {r.Vc_wide.toFixed(1)} kN</p>
@@ -629,20 +631,29 @@ export default function FoundationDesignPanel({
             </CardHeader>
             {showMethodology && (
               <CardContent className="text-[11px] space-y-2 text-muted-foreground">
-                <p className="font-semibold text-foreground">١- تحديد أبعاد القاعدة:</p>
-                <p>• q_net_allow = qa − γ_soil × (Df−t) − γ_conc × t</p>
-                <p>• A_req = P_service / q_net_allow → B = √A_req (مربعة)</p>
+                <div className="rounded bg-amber-50 border border-amber-200 p-2 mb-2">
+                  <p className="font-bold text-amber-800 mb-1">تخفيضات إجهادات WSM (ACI 318 Appendix B)</p>
+                  <p className="text-amber-700">• <b>fc_allow = 0.45 × f'c</b>  ← إجهاد ضغط الخرسانة المسموح</p>
+                  <p className="text-amber-700">• <b>fs_allow = min(0.5 × fy , 207 MPa)</b>  ← إجهاد حديد التسليح المسموح</p>
+                  <p className="text-amber-700">• <b>n = Es / Ec = 200000 / (4700√f'c)</b>  ← نسبة المعاملات المرنة</p>
+                  <p className="text-amber-700">• k = n·ρ·(√(1 + 2/(nρ)) − 1)  ,  j = 1 − k/3</p>
+                </div>
+                <p className="font-semibold text-foreground">١- تحديد أبعاد القاعدة (مستطيلة بنسبة عمود):</p>
+                <p>• q_net_allow = qa − γ_soil×(Df−t) − γ_conc×t</p>
+                <p>• aspect = colH / colB  →  B×L = P / q_net_allow</p>
+                <p>• t_min (ACI §13.3.1.2) = max(300, cover+150+32) mm</p>
+                <p>• تقريب الأبعاد لأقرب 50 mm</p>
                 <p className="font-semibold text-foreground">٢- تصميم التسليح (WSM):</p>
                 <p>• M = q_act × a² / 2  (a = كابولي عند وجه العمود)</p>
-                <p>• As = M × 10⁶ / (fs_allow × j × d)  حيث j = 1 − k/3</p>
-                <p>• k = n·fc_allow / (n·fc_allow + fs_allow) ، n = Es/Ec</p>
-                <p>• As_min = ρ_min × b × d  (ρ_min = 0.0018 لـ fy≥420 أو 0.002)</p>
+                <p>• As = M×10⁶ / (fs_allow × j × d)</p>
+                <p>• As_min = ρ_min×b×d  (ρ_min = 0.0018 لـ fy≥420 أو 0.002)</p>
+                <p>• Ø_min = 16 mm  (حسب المعيار الخليجي GSO)</p>
                 <p className="font-semibold text-foreground">٣- فحص القص:</p>
-                <p>• قص عريض: Vc = 0.083√f'c × b × d  (ACI 318 Appendix A)</p>
-                <p>• قص ثقبي: Vc = min(0.083(2+4/βc)√f'c, 0.166√f'c) × b₀ × d</p>
-                <p>• المحيط الحرج b₀ = 2[(bc+d)+(hc+d)] عند d/2 من وجه العمود</p>
-                <p className="font-semibold text-foreground">٤- تكرار السُّمك:</p>
-                <p>• إذا تجاوز القص المقاومة يُزداد السُّمك بمقدار 50mm ويعاد الحساب.</p>
+                <p>• قص عريض: vc = 0.083√f'c MPa  (ACI 318 App.A)</p>
+                <p>• قص ثقبي: vc = min(0.083(2+4/βc)√f'c, 0.166√f'c) MPa</p>
+                <p>• b₀ = 2[(bc+d)+(hc+d)]  عند d/2 من وجه العمود</p>
+                <p className="font-semibold text-foreground">٤- تكرار التصميم:</p>
+                <p>• t يبدأ من t_min_aci ويزداد 50mm إذا تجاوز القص الحد المسموح.</p>
               </CardContent>
             )}
           </Card>
