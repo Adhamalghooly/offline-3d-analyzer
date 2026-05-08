@@ -286,13 +286,38 @@ export function designFooting(
 
 // ─── ACI 318 Foundation Drawing ──────────────────────────────────────────────
 
-// ─── SVG shared defs builder ──────────────────────────────────────────────────
-function svgDefs(id: string): string {
-  return `<defs>
-    <marker id="arr${id}" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto">
+/**
+ * buildTypeDetailSVG
+ * Creates a single wide SVG (780 × 320 px) showing all three views
+ * of one footing type side-by-side, with no external CSS or HTML tables.
+ *
+ * Layout (left → right):
+ *   [PLAN VIEW 260px] | [SECTION A-A 260px] | [SECTION B-B 260px]
+ *
+ * Each panel has its own coordinate origin via SVG <g transform="translate(...)">
+ * and its own <defs> IDs to avoid conflicts when multiple types are embedded.
+ */
+function buildTypeDetailSVG(
+  r: FootingDesignResult,
+  mat: FootingMaterials,
+  typeKey: string,
+  colIds: string[],
+  t_min_aci: number,
+): string {
+  const TOTAL_W = 780;
+  const TOTAL_H = 320;
+  const PANEL_W = 260;       // each of the 3 panels
+  const CONTENT_H = 300;     // drawing area height (20px title bar at top)
+  const TITLE_H = 20;
+  const SEP = 0;             // panels share edges, separator drawn as a line
+  const id = 'T' + typeKey.replace(/[^a-z0-9]/gi, '_');
+
+  // ── Shared defs ───────────────────────────────────────────────────────────
+  const defs = `<defs>
+    <marker id="ar${id}" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto">
       <path d="M0,0 L5,2 L0,4 Z" fill="#c00"/>
     </marker>
-    <marker id="arrl${id}" markerWidth="5" markerHeight="4" refX="1" refY="2" orient="auto-start-reverse">
+    <marker id="arl${id}" markerWidth="5" markerHeight="4" refX="1" refY="2" orient="auto-start-reverse">
       <path d="M5,0 L0,2 L5,4 Z" fill="#c00"/>
     </marker>
     <pattern id="conc${id}" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
@@ -301,205 +326,209 @@ function svgDefs(id: string): string {
     <pattern id="soil${id}" patternUnits="userSpaceOnUse" width="6" height="4">
       <line x1="0" y1="0" x2="6" y2="4" stroke="#b8a070" stroke-width="0.7"/>
     </pattern>
-    <pattern id="hatch${id}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+    <pattern id="htch${id}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
       <line x1="0" y1="0" x2="0" y2="6" stroke="#b0b8c8" stroke-width="0.8"/>
     </pattern>
+    <clipPath id="clipP${id}"><rect x="0" y="0" width="${PANEL_W}" height="${CONTENT_H}"/></clipPath>
+    <clipPath id="clipA${id}"><rect x="0" y="0" width="${PANEL_W}" height="${CONTENT_H}"/></clipPath>
+    <clipPath id="clipB${id}"><rect x="0" y="0" width="${PANEL_W}" height="${CONTENT_H}"/></clipPath>
   </defs>`;
-}
 
-// ─── Per-type PLAN VIEW (top view) ────────────────────────────────────────────
-function buildTypePlanSVG(r: FootingDesignResult): string {
-  const W = 270, H = 270;
-  const id = 'P' + r.colId.replace(/[^a-z0-9]/gi, '_');
-  const PAD = 42;
-  const cx = W / 2, cy = H / 2;
-  const drawW = W - 2 * PAD - 6;
-  const drawH = H - 2 * PAD - 6;
-  const sc = Math.min(drawW / r.B, drawH / r.L);
-  const fw = r.B * sc;
-  const fh = r.L * sc;
-  const cw = r.colB * sc;
-  const ch = r.colH * sc;
-  const fx1 = cx - fw / 2, fx2 = cx + fw / 2;
-  const fy1 = cy - fh / 2, fy2 = cy + fh / 2;
-  const ccx1 = cx - cw / 2, ccx2 = cx + cw / 2;
-  const ccy1 = cy - ch / 2, ccy2 = cy + ch / 2;
+  // Dimension helpers (all coordinates are LOCAL within the panel)
+  function hdim(x1: number, x2: number, y: number, lbl: string, above = true): string {
+    const ty = above ? y - 3 : y + 9;
+    return `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#c00" stroke-width="0.6" marker-start="url(#arl${id})" marker-end="url(#ar${id})"/>
+<text x="${((x1 + x2) / 2).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="6.5" fill="#c00">${lbl}</text>`;
+  }
+  function vdim(x: number, y1: number, y2: number, lbl: string, toRight = false): string {
+    const mid = (y1 + y2) / 2;
+    const tx = toRight ? x + 4 : x - 4;
+    return `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#c00" stroke-width="0.6" marker-start="url(#arl${id})" marker-end="url(#ar${id})"/>
+<text x="${tx.toFixed(1)}" y="${(mid + 3).toFixed(1)}" text-anchor="${toRight ? 'start' : 'end'}" font-size="6.5" fill="#c00" transform="rotate(-90,${tx.toFixed(1)},${mid.toFixed(1)})">${lbl}</text>`;
+  }
 
-  let rebar = '';
-  const nxb = Math.min(r.bars_x, 14);
-  const nyb = Math.min(r.bars_y, 14);
+  // ══ PANEL 1: PLAN VIEW ═══════════════════════════════════════════════════
+  const P_PAD = 44;
+  const P_CX = PANEL_W / 2, P_CY = CONTENT_H / 2;
+  const P_dW = PANEL_W - 2 * P_PAD;
+  const P_dH = CONTENT_H - 2 * P_PAD;
+  const P_sc = Math.min(P_dW / r.B, P_dH / r.L);
+  const P_fw = r.B * P_sc, P_fh = r.L * P_sc;
+  const P_cw = r.colB * P_sc, P_ch = r.colH * P_sc;
+  const P_fx1 = P_CX - P_fw / 2, P_fx2 = P_CX + P_fw / 2;
+  const P_fy1 = P_CY - P_fh / 2, P_fy2 = P_CY + P_fh / 2;
+  const P_ccx1 = P_CX - P_cw / 2, P_ccx2 = P_CX + P_cw / 2;
+  const P_ccy1 = P_CY - P_ch / 2, P_ccy2 = P_CY + P_ch / 2;
+
+  let planRebar = '';
+  const nxb = Math.min(r.bars_x, 12);
+  const nyb = Math.min(r.bars_y, 12);
   for (let i = 1; i <= nxb; i++) {
-    const by = fy1 + i * fh / (nxb + 1);
-    rebar += `<line x1="${fx1.toFixed(1)}" y1="${by.toFixed(1)}" x2="${fx2.toFixed(1)}" y2="${by.toFixed(1)}" stroke="#c00" stroke-width="0.7" opacity="0.65"/>`;
+    const by = P_fy1 + i * P_fh / (nxb + 1);
+    planRebar += `<line x1="${P_fx1.toFixed(1)}" y1="${by.toFixed(1)}" x2="${P_fx2.toFixed(1)}" y2="${by.toFixed(1)}" stroke="#c00" stroke-width="0.7" opacity="0.55"/>`;
   }
   for (let i = 1; i <= nyb; i++) {
-    const bx = fx1 + i * fw / (nyb + 1);
-    rebar += `<line x1="${bx.toFixed(1)}" y1="${fy1.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${fy2.toFixed(1)}" stroke="#880000" stroke-width="0.7" opacity="0.65"/>`;
+    const bx = P_fx1 + i * P_fw / (nyb + 1);
+    planRebar += `<line x1="${bx.toFixed(1)}" y1="${P_fy1.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${P_fy2.toFixed(1)}" stroke="#800" stroke-width="0.7" opacity="0.55"/>`;
   }
 
-  function hd(x1: number, x2: number, y: number, lbl: string, above = true): string {
-    const ty = above ? y - 4 : y + 9;
-    return `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-    <text x="${((x1 + x2) / 2).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="7" fill="#c00">${lbl}</text>`;
+  let planDims = '';
+  planDims += hdim(P_fx1, P_fx2, P_fy1 - 22, `B = ${r.B} mm`);
+  planDims += vdim(P_fx2 + 22, P_fy1, P_fy2, `L = ${r.L} mm`, true);
+  planDims += hdim(P_fx1, P_ccx1, P_fy2 + 14, `${r.a_x.toFixed(0)}`, false);
+  planDims += hdim(P_ccx2, P_fx2, P_fy2 + 14, `${r.a_x.toFixed(0)}`, false);
+  planDims += vdim(P_fx1 - 14, P_fy1, P_ccy1, `${r.a_y.toFixed(0)}`);
+  planDims += vdim(P_fx1 - 14, P_ccy2, P_fy2, `${r.a_y.toFixed(0)}`);
+  if (P_cw > 16) planDims += hdim(P_ccx1, P_ccx2, P_ccy1 - 7, `b=${r.colB}`);
+  if (P_ch > 16) planDims += vdim(P_ccx2 + 8, P_ccy1, P_ccy2, `h=${r.colH}`, true);
+
+  const planCuts = `
+<line x1="${(P_fx1 - 8).toFixed(1)}" y1="${P_CY.toFixed(1)}" x2="${(P_fx2 + 8).toFixed(1)}" y2="${P_CY.toFixed(1)}" stroke="#1a3a5c" stroke-width="0.9" stroke-dasharray="4,2"/>
+<text x="${(P_fx1 - 10).toFixed(1)}" y="${(P_CY + 3).toFixed(1)}" text-anchor="end" font-size="8" font-weight="bold" fill="#1a3a5c">A</text>
+<text x="${(P_fx2 + 10).toFixed(1)}" y="${(P_CY + 3).toFixed(1)}" text-anchor="start" font-size="8" font-weight="bold" fill="#1a3a5c">A</text>
+<line x1="${P_CX.toFixed(1)}" y1="${(P_fy1 - 8).toFixed(1)}" x2="${P_CX.toFixed(1)}" y2="${(P_fy2 + 8).toFixed(1)}" stroke="#880000" stroke-width="0.9" stroke-dasharray="4,2"/>
+<text x="${P_CX.toFixed(1)}" y="${(P_fy1 - 10).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="bold" fill="#880000">B</text>
+<text x="${P_CX.toFixed(1)}" y="${(P_fy2 + 16).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="bold" fill="#880000">B</text>`;
+
+  const panelPlan = `
+<g transform="translate(0,${TITLE_H})" clip-path="url(#clipP${id})">
+  <rect width="${PANEL_W}" height="${CONTENT_H}" fill="#f8fafd"/>
+  ${planRebar}
+  <rect x="${P_fx1.toFixed(1)}" y="${P_fy1.toFixed(1)}" width="${P_fw.toFixed(1)}" height="${P_fh.toFixed(1)}" fill="none" stroke="#1a3a5c" stroke-width="1.8"/>
+  <rect x="${P_ccx1.toFixed(1)}" y="${P_ccy1.toFixed(1)}" width="${P_cw.toFixed(1)}" height="${P_ch.toFixed(1)}" fill="#1a3a5c" fill-opacity="0.82" stroke="#1a3a5c" stroke-width="0.8"/>
+  <text x="${P_CX.toFixed(1)}" y="${P_CY.toFixed(1)}" text-anchor="middle" fill="#fff" font-size="6.5" font-weight="bold">عمود</text>
+  ${planCuts}
+  ${planDims}
+  <text x="${(PANEL_W / 2).toFixed(1)}" y="${(CONTENT_H - 4).toFixed(1)}" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a3a5c">مسقط أفقي — Plan View</text>
+</g>`;
+
+  // ══ PANEL 2: SECTION A-A (shows B-width, colB) ════════════════════════════
+  // Section A-A cuts through the L-axis (horizontal cut), looking along L-direction
+  // → footing width in drawing = B, column width = colB
+  // → bars running in B-direction (bars_x) appear as a continuous line
+  // → bars running in L-direction (bars_y) appear as DOTS
+  const A_cover = mat.cover;
+  const A_sc = Math.min((PANEL_W * 0.60) / r.B, (CONTENT_H * 0.46) / r.t);
+  const A_sv = PANEL_W / 2;
+  const A_footW = r.B * A_sc;
+  const A_footH = r.t * A_sc;
+  const A_colW  = r.colB * A_sc;
+  const A_dfH   = Math.min(32, 0.3 * r.d * A_sc);
+  const A_GY = 28, A_FY = A_GY + A_dfH, A_BY = A_FY + A_footH;
+  const A_fX1 = A_sv - A_footW / 2, A_fX2 = A_sv + A_footW / 2;
+  const A_cX1 = A_sv - A_colW / 2;
+  const A_cTop = Math.max(2, A_GY - 35);
+  const A_dY_bot = A_BY - A_cover * A_sc - r.dia_y * A_sc / 2;
+  const A_dY_top = A_dY_bot - r.dia_y * A_sc - r.dia_x * A_sc;
+  const A_nDots = Math.min(r.bars_y, 9);
+  let A_rebarDots = '';
+  for (let i = 0; i < A_nDots; i++) {
+    const bx = A_fX1 + A_footW * (i + 1) / (A_nDots + 1);
+    A_rebarDots += `<circle cx="${bx.toFixed(1)}" cy="${A_dY_bot.toFixed(1)}" r="2.2" fill="#c00" stroke="#800" stroke-width="0.4"/>`;
   }
-  function vd(x: number, y1: number, y2: number, lbl: string, toRight = false): string {
-    const mid = (y1 + y2) / 2;
-    const tx = toRight ? x + 5 : x - 5;
-    return `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-    <text x="${tx.toFixed(1)}" y="${(mid + 3).toFixed(1)}" text-anchor="${toRight ? 'start' : 'end'}" font-size="7" fill="#c00" transform="rotate(-90,${tx.toFixed(1)},${mid.toFixed(1)})">${lbl}</text>`;
+  A_rebarDots += `<line x1="${(A_fX1 + 3).toFixed(1)}" y1="${A_dY_top.toFixed(1)}" x2="${(A_fX2 - 3).toFixed(1)}" y2="${A_dY_top.toFixed(1)}" stroke="#880000" stroke-width="2.2"/>`;
+
+  const panelSecA = `
+<g transform="translate(${PANEL_W},${TITLE_H})" clip-path="url(#clipA${id})">
+  <rect width="${PANEL_W}" height="${CONTENT_H}" fill="#fdfaf8"/>
+  <rect x="0" y="${A_GY.toFixed(1)}" width="${PANEL_W}" height="${A_dfH.toFixed(1)}" fill="url(#soil${id})" opacity="0.65"/>
+  <line x1="0" y1="${A_GY.toFixed(1)}" x2="${PANEL_W}" y2="${A_GY.toFixed(1)}" stroke="#6a5430" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="3" y="${(A_GY - 2).toFixed(1)}" font-size="6.5" fill="#6a5430">G.L.</text>
+  <rect x="${A_cX1.toFixed(1)}" y="${A_cTop.toFixed(1)}" width="${A_colW.toFixed(1)}" height="${(A_GY - A_cTop + A_dfH).toFixed(1)}" fill="url(#conc${id})" opacity="0.5" stroke="#1a3a5c" stroke-width="1.2"/>
+  <text x="${A_sv.toFixed(1)}" y="${(A_cTop + 9).toFixed(1)}" text-anchor="middle" font-size="6.5" fill="#1a3a5c">عمود</text>
+  <rect x="${A_fX1.toFixed(1)}" y="${A_FY.toFixed(1)}" width="${A_footW.toFixed(1)}" height="${A_footH.toFixed(1)}" fill="url(#conc${id})" opacity="0.5" stroke="#1a3a5c" stroke-width="1.8"/>
+  <rect x="${A_fX1.toFixed(1)}" y="${A_BY.toFixed(1)}" width="${A_footW.toFixed(1)}" height="9" fill="#d0d8e0" stroke="#888" stroke-width="0.6"/>
+  <text x="${A_sv.toFixed(1)}" y="${(A_BY + 7.5).toFixed(1)}" text-anchor="middle" font-size="6" fill="#555">طبقة نظافة 50mm</text>
+  <line x1="${(A_fX1 + 2).toFixed(1)}" y1="${A_dY_bot.toFixed(1)}" x2="${(A_fX2 - 2).toFixed(1)}" y2="${A_dY_bot.toFixed(1)}" stroke="#1a3a5c" stroke-width="0.3" stroke-dasharray="3,2"/>
+  ${A_rebarDots}
+  <text x="${(A_fX2 + 2).toFixed(1)}" y="${(A_dY_bot + 3).toFixed(1)}" font-size="5.5" fill="#c00">${r.bars_y}Ø${r.dia_y}@${r.spacing_y} ‖ L</text>
+  <text x="${(A_fX2 + 2).toFixed(1)}" y="${(A_dY_top + 3).toFixed(1)}" font-size="5.5" fill="#800">${r.bars_x}Ø${r.dia_x}@${r.spacing_x} ‖ B</text>
+  ${hdim(A_fX1, A_fX2, A_BY + 17, `B = ${r.B} mm`, false)}
+  ${hdim(A_cX1, A_cX1 + A_colW, A_FY - 7, `b=${r.colB}`)}
+  ${vdim(A_fX1 - 9, A_FY, A_BY, `t=${r.t}`)}
+  ${vdim(A_fX1 - 20, A_dY_bot, A_BY, `d=${r.d}`)}
+  <line x1="${(A_fX2 + 16).toFixed(1)}" y1="${A_BY.toFixed(1)}" x2="${(A_fX2 + 16).toFixed(1)}" y2="${A_dY_bot.toFixed(1)}" stroke="#888" stroke-width="0.6" marker-start="url(#arl${id})" marker-end="url(#ar${id})"/>
+  <text x="${(A_fX2 + 18).toFixed(1)}" y="${((A_BY + A_dY_bot) / 2 + 3).toFixed(1)}" font-size="5.5" fill="#888">غ.${mat.cover}</text>
+  <text x="${(PANEL_W / 2).toFixed(1)}" y="${(CONTENT_H - 4).toFixed(1)}" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a3a5c">قطاع أ—أ (Section A-A)</text>
+</g>`;
+
+  // ══ PANEL 3: SECTION B-B (shows L-length, colH) ═══════════════════════════
+  // Section B-B cuts through the B-axis (vertical cut), looking along B-direction
+  // → footing width in drawing = L, column width = colH
+  // → bars running in L-direction (bars_y) appear as a continuous line
+  // → bars running in B-direction (bars_x) appear as DOTS
+  const B_cover = mat.cover;
+  const B_sc = Math.min((PANEL_W * 0.60) / r.L, (CONTENT_H * 0.46) / r.t);
+  const B_sv = PANEL_W / 2;
+  const B_footW = r.L * B_sc;
+  const B_footH = r.t * B_sc;
+  const B_colW  = r.colH * B_sc;
+  const B_dfH   = Math.min(32, 0.3 * r.d * B_sc);
+  const B_GY = 28, B_FY = B_GY + B_dfH, B_BY = B_FY + B_footH;
+  const B_fX1 = B_sv - B_footW / 2, B_fX2 = B_sv + B_footW / 2;
+  const B_cX1 = B_sv - B_colW / 2;
+  const B_cTop = Math.max(2, B_GY - 35);
+  const B_dY_bot = B_BY - B_cover * B_sc - r.dia_x * B_sc / 2;
+  const B_dY_top = B_dY_bot - r.dia_x * B_sc - r.dia_y * B_sc;
+  const B_nDots = Math.min(r.bars_x, 9);
+  let B_rebarDots = '';
+  for (let i = 0; i < B_nDots; i++) {
+    const bx = B_fX1 + B_footW * (i + 1) / (B_nDots + 1);
+    B_rebarDots += `<circle cx="${bx.toFixed(1)}" cy="${B_dY_bot.toFixed(1)}" r="2.2" fill="#c00" stroke="#800" stroke-width="0.4"/>`;
   }
+  B_rebarDots += `<line x1="${(B_fX1 + 3).toFixed(1)}" y1="${B_dY_top.toFixed(1)}" x2="${(B_fX2 - 3).toFixed(1)}" y2="${B_dY_top.toFixed(1)}" stroke="#880000" stroke-width="2.2"/>`;
 
-  let dims = '';
-  dims += hd(fx1, fx2, fy1 - 24, `B = ${r.B} mm`);
-  dims += vd(fx2 + 24, fy1, fy2, `L = ${r.L} mm`, true);
-  dims += hd(fx1, ccx1, fy2 + 16, `ax=${r.a_x.toFixed(0)}`, false);
-  dims += hd(ccx2, fx2, fy2 + 16, `ax=${r.a_x.toFixed(0)}`, false);
-  dims += vd(fx1 - 16, fy1, ccy1, `ay=${r.a_y.toFixed(0)}`);
-  dims += vd(fx1 - 16, ccy2, fy2, `ay=${r.a_y.toFixed(0)}`);
-  if (cw > 18) dims += hd(ccx1, ccx2, ccy1 - 7, `b=${r.colB}`);
-  if (ch > 18) dims += vd(ccx2 + 8, ccy1, ccy2, `h=${r.colH}`, true);
+  const panelSecB = `
+<g transform="translate(${PANEL_W * 2},${TITLE_H})" clip-path="url(#clipB${id})">
+  <rect width="${PANEL_W}" height="${CONTENT_H}" fill="#f8fdf8"/>
+  <rect x="0" y="${B_GY.toFixed(1)}" width="${PANEL_W}" height="${B_dfH.toFixed(1)}" fill="url(#soil${id})" opacity="0.65"/>
+  <line x1="0" y1="${B_GY.toFixed(1)}" x2="${PANEL_W}" y2="${B_GY.toFixed(1)}" stroke="#6a5430" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="3" y="${(B_GY - 2).toFixed(1)}" font-size="6.5" fill="#6a5430">G.L.</text>
+  <rect x="${B_cX1.toFixed(1)}" y="${B_cTop.toFixed(1)}" width="${B_colW.toFixed(1)}" height="${(B_GY - B_cTop + B_dfH).toFixed(1)}" fill="url(#conc${id})" opacity="0.5" stroke="#1a3a5c" stroke-width="1.2"/>
+  <text x="${B_sv.toFixed(1)}" y="${(B_cTop + 9).toFixed(1)}" text-anchor="middle" font-size="6.5" fill="#1a3a5c">عمود</text>
+  <rect x="${B_fX1.toFixed(1)}" y="${B_FY.toFixed(1)}" width="${B_footW.toFixed(1)}" height="${B_footH.toFixed(1)}" fill="url(#conc${id})" opacity="0.5" stroke="#1a3a5c" stroke-width="1.8"/>
+  <rect x="${B_fX1.toFixed(1)}" y="${B_BY.toFixed(1)}" width="${B_footW.toFixed(1)}" height="9" fill="#d0d8e0" stroke="#888" stroke-width="0.6"/>
+  <text x="${B_sv.toFixed(1)}" y="${(B_BY + 7.5).toFixed(1)}" text-anchor="middle" font-size="6" fill="#555">طبقة نظافة 50mm</text>
+  <line x1="${(B_fX1 + 2).toFixed(1)}" y1="${B_dY_bot.toFixed(1)}" x2="${(B_fX2 - 2).toFixed(1)}" y2="${B_dY_bot.toFixed(1)}" stroke="#1a3a5c" stroke-width="0.3" stroke-dasharray="3,2"/>
+  ${B_rebarDots}
+  <text x="${(B_fX2 + 2).toFixed(1)}" y="${(B_dY_bot + 3).toFixed(1)}" font-size="5.5" fill="#c00">${r.bars_x}Ø${r.dia_x}@${r.spacing_x} ‖ B</text>
+  <text x="${(B_fX2 + 2).toFixed(1)}" y="${(B_dY_top + 3).toFixed(1)}" font-size="5.5" fill="#800">${r.bars_y}Ø${r.dia_y}@${r.spacing_y} ‖ L</text>
+  ${hdim(B_fX1, B_fX2, B_BY + 17, `L = ${r.L} mm`, false)}
+  ${hdim(B_cX1, B_cX1 + B_colW, B_FY - 7, `h=${r.colH}`)}
+  ${vdim(B_fX1 - 9, B_FY, B_BY, `t=${r.t}`)}
+  ${vdim(B_fX1 - 20, B_dY_bot, B_BY, `d=${r.d}`)}
+  <line x1="${(B_fX2 + 16).toFixed(1)}" y1="${B_BY.toFixed(1)}" x2="${(B_fX2 + 16).toFixed(1)}" y2="${B_dY_bot.toFixed(1)}" stroke="#888" stroke-width="0.6" marker-start="url(#arl${id})" marker-end="url(#ar${id})"/>
+  <text x="${(B_fX2 + 18).toFixed(1)}" y="${((B_BY + B_dY_bot) / 2 + 3).toFixed(1)}" font-size="5.5" fill="#888">غ.${mat.cover}</text>
+  <text x="${(PANEL_W / 2).toFixed(1)}" y="${(CONTENT_H - 4).toFixed(1)}" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#880000">قطاع ب—ب (Section B-B)</text>
+</g>`;
 
-  const cuts = `
-  <line x1="${(fx1 - 10).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(fx2 + 10).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#1a3a5c" stroke-width="1" stroke-dasharray="5,2"/>
-  <text x="${(fx1 - 12).toFixed(1)}" y="${(cy + 3).toFixed(1)}" text-anchor="end" font-size="9" font-weight="bold" fill="#1a3a5c">A</text>
-  <text x="${(fx2 + 12).toFixed(1)}" y="${(cy + 3).toFixed(1)}" text-anchor="start" font-size="9" font-weight="bold" fill="#1a3a5c">A</text>
-  <line x1="${cx.toFixed(1)}" y1="${(fy1 - 10).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(fy2 + 10).toFixed(1)}" stroke="#880000" stroke-width="1" stroke-dasharray="5,2"/>
-  <text x="${cx.toFixed(1)}" y="${(fy1 - 12).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="bold" fill="#880000">B</text>
-  <text x="${cx.toFixed(1)}" y="${(fy2 + 18).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="bold" fill="#880000">B</text>`;
+  // ── Title bar across full width ────────────────────────────────────────────
+  const titleBar = `
+<rect x="0" y="0" width="${TOTAL_W}" height="${TITLE_H}" fill="#1a3a5c"/>
+<text x="10" y="14" font-size="9" font-weight="bold" fill="#fff" font-family="Arial,sans-serif">
+  نوع ${typeKey} — ${r.B}×${r.L}×${r.t} mm  |  t_min,ACI = ${t_min_aci} mm  |  أعمدة: ${colIds.join(', ')}
+</text>`;
 
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
-  ${svgDefs(id)}
-  <rect width="${W}" height="${H}" fill="#f8f9fb"/>
-  ${rebar}
-  <rect x="${fx1.toFixed(1)}" y="${fy1.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="#1a3a5c" stroke-width="2"/>
-  <rect x="${ccx1.toFixed(1)}" y="${ccy1.toFixed(1)}" width="${cw.toFixed(1)}" height="${ch.toFixed(1)}" fill="#1a3a5c" fill-opacity="0.85" stroke="#1a3a5c" stroke-width="1"/>
-  ${cuts}
-  ${dims}
-  <text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" fill="#fff" font-size="7" font-weight="bold">col</text>
-  <text x="4" y="10" font-size="7" fill="#555">مسقط (Plan View)</text>
-  </svg>`;
-}
+  // ── Vertical separator lines between panels ────────────────────────────────
+  const seps = `
+<line x1="${PANEL_W}" y1="0" x2="${PANEL_W}" y2="${TOTAL_H}" stroke="#1a3a5c" stroke-width="1.5"/>
+<line x1="${PANEL_W * 2}" y1="0" x2="${PANEL_W * 2}" y2="${TOTAL_H}" stroke="#1a3a5c" stroke-width="1.5"/>`;
 
-// ─── SECTION A-A: cut perpendicular to L-axis → shows B & colB ───────────────
-function buildSectionASVG(r: FootingDesignResult, mat: FootingMaterials): string {
-  const W = 255, H = 215;
-  const id = 'SA' + r.colId.replace(/[^a-z0-9]/gi, '_');
-  const cover = mat.cover;
-  const sc = Math.min((W * 0.62) / r.B, (H * 0.48) / r.t);
-  const sv = W / 2;
-  const footW = r.B * sc;
-  const footH = r.t * sc;
-  const colW = r.colB * sc;
-  const dfH = Math.min(36, 0.33 * r.d * sc);
-  const GY = 30, FY = GY + dfH, BY = FY + footH;
-  const fX1 = sv - footW / 2, fX2 = sv + footW / 2;
-  const cX1 = sv - colW / 2;
-  const cTop = Math.max(2, GY - 38);
-  // A-A: viewing along x → bars_y (running in y) appear as DOTS
-  const dY_bot = BY - cover * sc - r.dia_y * sc / 2;
-  const dY_top = dY_bot - r.dia_y * sc - r.dia_x * sc;
-  const nDots = Math.min(r.bars_y, 9);
-  let rebarDots = '';
-  for (let i = 0; i < nDots; i++) {
-    const bx = fX1 + (footW) * (i + 1) / (nDots + 1);
-    rebarDots += `<circle cx="${bx.toFixed(1)}" cy="${dY_bot.toFixed(1)}" r="2.5" fill="#c00" stroke="#800" stroke-width="0.5"/>`;
-  }
-  rebarDots += `<line x1="${(fX1 + 4).toFixed(1)}" y1="${dY_top.toFixed(1)}" x2="${(fX2 - 4).toFixed(1)}" y2="${dY_top.toFixed(1)}" stroke="#880000" stroke-width="2.5"/>`;
+  // ── Outer border ───────────────────────────────────────────────────────────
+  const border = `<rect x="0.5" y="0.5" width="${TOTAL_W - 1}" height="${TOTAL_H - 1}" fill="none" stroke="#1a3a5c" stroke-width="1.5"/>`;
 
-  function hd(x1: number, x2: number, y: number, lbl: string, above = true): string {
-    const ty = above ? y - 4 : y + 9;
-    return `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-    <text x="${((x1 + x2) / 2).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="7" fill="#c00">${lbl}</text>`;
-  }
-  function vd(x: number, y1: number, y2: number, lbl: string, toRight = false): string {
-    return `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-    <text x="${(toRight ? x + 4 : x - 4).toFixed(1)}" y="${((y1 + y2) / 2 + 3).toFixed(1)}" text-anchor="${toRight ? 'start' : 'end'}" font-size="7" fill="#c00">${lbl}</text>`;
-  }
-
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
-  ${svgDefs(id)}
-  <rect width="${W}" height="${H}" fill="#f8f9fb"/>
-  <rect x="0" y="${GY.toFixed(1)}" width="${W}" height="${dfH.toFixed(1)}" fill="url(#soil${id})" opacity="0.7"/>
-  <line x1="0" y1="${GY.toFixed(1)}" x2="${W}" y2="${GY.toFixed(1)}" stroke="#6a5430" stroke-width="1.5" stroke-dasharray="4,2"/>
-  <text x="4" y="${(GY - 2).toFixed(1)}" font-size="7" fill="#6a5430">G.L.</text>
-  <rect x="${cX1.toFixed(1)}" y="${cTop.toFixed(1)}" width="${colW.toFixed(1)}" height="${(GY - cTop + dfH).toFixed(1)}" fill="url(#conc${id})" opacity="0.55" stroke="#1a3a5c" stroke-width="1.5"/>
-  <text x="${sv.toFixed(1)}" y="${(cTop + 10).toFixed(1)}" text-anchor="middle" font-size="7" fill="#1a3a5c">عمود</text>
-  <rect x="${fX1.toFixed(1)}" y="${FY.toFixed(1)}" width="${footW.toFixed(1)}" height="${footH.toFixed(1)}" fill="url(#conc${id})" opacity="0.55" stroke="#1a3a5c" stroke-width="2"/>
-  <rect x="${fX1.toFixed(1)}" y="${BY.toFixed(1)}" width="${footW.toFixed(1)}" height="10" fill="#d0d8e0" stroke="#888" stroke-width="0.8"/>
-  <text x="${sv.toFixed(1)}" y="${(BY + 8).toFixed(1)}" text-anchor="middle" font-size="6.5" fill="#555">طبقة نظافة 50mm</text>
-  <line x1="${(fX1 + 2).toFixed(1)}" y1="${dY_bot.toFixed(1)}" x2="${(fX2 - 2).toFixed(1)}" y2="${dY_bot.toFixed(1)}" stroke="#1a3a5c" stroke-width="0.4" stroke-dasharray="3,2"/>
-  ${rebarDots}
-  <text x="${(fX2 + 3).toFixed(1)}" y="${(dY_bot + 3).toFixed(1)}" font-size="6" fill="#c00">${r.bars_y}Ø${r.dia_y}@${r.spacing_y} ‖ L</text>
-  <text x="${(fX2 + 3).toFixed(1)}" y="${(dY_top + 3).toFixed(1)}" font-size="6" fill="#880000">${r.bars_x}Ø${r.dia_x}@${r.spacing_x} ‖ B</text>
-  ${hd(fX1, fX2, BY + 18, `B = ${r.B} mm`, false)}
-  ${hd(cX1, cX1 + colW, FY - 8, `col b = ${r.colB} mm`)}
-  ${vd(fX1 - 10, FY, BY, `t = ${r.t} mm`)}
-  ${vd(fX1 - 22, dY_bot, BY, `d = ${r.d} mm`)}
-  <line x1="${(fX2 + 18).toFixed(1)}" y1="${BY.toFixed(1)}" x2="${(fX2 + 18).toFixed(1)}" y2="${dY_bot.toFixed(1)}" stroke="#888" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-  <text x="${(fX2 + 20).toFixed(1)}" y="${((BY + dY_bot) / 2 + 3).toFixed(1)}" font-size="6" fill="#888">غ. ${mat.cover}mm</text>
-  <text x="${sv.toFixed(1)}" y="${(H - 3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="bold" fill="#1a3a5c">قطاع أ—أ (Section A-A)</text>
-  </svg>`;
-}
-
-// ─── SECTION B-B: cut perpendicular to B-axis → shows L & colH ───────────────
-function buildSectionBSVG(r: FootingDesignResult, mat: FootingMaterials): string {
-  const W = 255, H = 215;
-  const id = 'SB' + r.colId.replace(/[^a-z0-9]/gi, '_');
-  const cover = mat.cover;
-  const sc = Math.min((W * 0.62) / r.L, (H * 0.48) / r.t);
-  const sv = W / 2;
-  const footW = r.L * sc;
-  const footH = r.t * sc;
-  const colW = r.colH * sc;
-  const dfH = Math.min(36, 0.33 * r.d * sc);
-  const GY = 30, FY = GY + dfH, BY = FY + footH;
-  const fX1 = sv - footW / 2, fX2 = sv + footW / 2;
-  const cX1 = sv - colW / 2;
-  const cTop = Math.max(2, GY - 38);
-  // B-B: viewing along y → bars_x (running in x) appear as DOTS
-  const dY_bot = BY - cover * sc - r.dia_x * sc / 2;
-  const dY_top = dY_bot - r.dia_x * sc - r.dia_y * sc;
-  const nDots = Math.min(r.bars_x, 9);
-  let rebarDots = '';
-  for (let i = 0; i < nDots; i++) {
-    const bx = fX1 + footW * (i + 1) / (nDots + 1);
-    rebarDots += `<circle cx="${bx.toFixed(1)}" cy="${dY_bot.toFixed(1)}" r="2.5" fill="#c00" stroke="#800" stroke-width="0.5"/>`;
-  }
-  rebarDots += `<line x1="${(fX1 + 4).toFixed(1)}" y1="${dY_top.toFixed(1)}" x2="${(fX2 - 4).toFixed(1)}" y2="${dY_top.toFixed(1)}" stroke="#880000" stroke-width="2.5"/>`;
-
-  function hd(x1: number, x2: number, y: number, lbl: string, above = true): string {
-    const ty = above ? y - 4 : y + 9;
-    return `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-    <text x="${((x1 + x2) / 2).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="7" fill="#c00">${lbl}</text>`;
-  }
-  function vd(x: number, y1: number, y2: number, lbl: string, toRight = false): string {
-    return `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-    <text x="${(toRight ? x + 4 : x - 4).toFixed(1)}" y="${((y1 + y2) / 2 + 3).toFixed(1)}" text-anchor="${toRight ? 'start' : 'end'}" font-size="7" fill="#c00">${lbl}</text>`;
-  }
-
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
-  ${svgDefs(id)}
-  <rect width="${W}" height="${H}" fill="#f8f9fb"/>
-  <rect x="0" y="${GY.toFixed(1)}" width="${W}" height="${dfH.toFixed(1)}" fill="url(#soil${id})" opacity="0.7"/>
-  <line x1="0" y1="${GY.toFixed(1)}" x2="${W}" y2="${GY.toFixed(1)}" stroke="#6a5430" stroke-width="1.5" stroke-dasharray="4,2"/>
-  <text x="4" y="${(GY - 2).toFixed(1)}" font-size="7" fill="#6a5430">G.L.</text>
-  <rect x="${cX1.toFixed(1)}" y="${cTop.toFixed(1)}" width="${colW.toFixed(1)}" height="${(GY - cTop + dfH).toFixed(1)}" fill="url(#conc${id})" opacity="0.55" stroke="#1a3a5c" stroke-width="1.5"/>
-  <text x="${sv.toFixed(1)}" y="${(cTop + 10).toFixed(1)}" text-anchor="middle" font-size="7" fill="#1a3a5c">عمود</text>
-  <rect x="${fX1.toFixed(1)}" y="${FY.toFixed(1)}" width="${footW.toFixed(1)}" height="${footH.toFixed(1)}" fill="url(#conc${id})" opacity="0.55" stroke="#1a3a5c" stroke-width="2"/>
-  <rect x="${fX1.toFixed(1)}" y="${BY.toFixed(1)}" width="${footW.toFixed(1)}" height="10" fill="#d0d8e0" stroke="#888" stroke-width="0.8"/>
-  <text x="${sv.toFixed(1)}" y="${(BY + 8).toFixed(1)}" text-anchor="middle" font-size="6.5" fill="#555">طبقة نظافة 50mm</text>
-  <line x1="${(fX1 + 2).toFixed(1)}" y1="${dY_bot.toFixed(1)}" x2="${(fX2 - 2).toFixed(1)}" y2="${dY_bot.toFixed(1)}" stroke="#1a3a5c" stroke-width="0.4" stroke-dasharray="3,2"/>
-  ${rebarDots}
-  <text x="${(fX2 + 3).toFixed(1)}" y="${(dY_bot + 3).toFixed(1)}" font-size="6" fill="#c00">${r.bars_x}Ø${r.dia_x}@${r.spacing_x} ‖ B</text>
-  <text x="${(fX2 + 3).toFixed(1)}" y="${(dY_top + 3).toFixed(1)}" font-size="6" fill="#880000">${r.bars_y}Ø${r.dia_y}@${r.spacing_y} ‖ L</text>
-  ${hd(fX1, fX2, BY + 18, `L = ${r.L} mm`, false)}
-  ${hd(cX1, cX1 + colW, FY - 8, `col h = ${r.colH} mm`)}
-  ${vd(fX1 - 10, FY, BY, `t = ${r.t} mm`)}
-  ${vd(fX1 - 22, dY_bot, BY, `d = ${r.d} mm`)}
-  <line x1="${(fX2 + 18).toFixed(1)}" y1="${BY.toFixed(1)}" x2="${(fX2 + 18).toFixed(1)}" y2="${dY_bot.toFixed(1)}" stroke="#888" stroke-width="0.7" marker-start="url(#arrl${id})" marker-end="url(#arr${id})"/>
-  <text x="${(fX2 + 20).toFixed(1)}" y="${((BY + dY_bot) / 2 + 3).toFixed(1)}" font-size="6" fill="#888">غ. ${mat.cover}mm</text>
-  <text x="${sv.toFixed(1)}" y="${(H - 3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="bold" fill="#880000">قطاع ب—ب (Section B-B)</text>
-  </svg>`;
+  return `<svg width="${TOTAL_W}" height="${TOTAL_H}" viewBox="0 0 ${TOTAL_W} ${TOTAL_H}"
+  xmlns="http://www.w3.org/2000/svg"
+  style="display:block;width:100%;max-width:${TOTAL_W}px;height:auto;margin-bottom:0">
+  ${defs}
+  ${border}
+  ${titleBar}
+  ${panelPlan}
+  ${panelSecA}
+  ${panelSecB}
+  ${seps}
+</svg>`
+  + SEP; // SEP is 0, just for readability
 }
 
 /**
@@ -674,33 +703,12 @@ export function generateFoundationDrawingHTML(
   planElems += `<polygon points="${naX},${naY - 12} ${naX - 6},${naY + 8} ${naX},${naY + 3} ${naX + 6},${naY + 8}" fill="#1a3a5c" stroke="#1a3a5c" stroke-width="0.5"/>
     <text x="${naX}" y="${naY + 20}" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a3a5c">N</text>`;
 
-  // ── Per-type detail SVGs — use <table> for reliable layout in popup HTML ──
-  const perTypeHTML = [...typeMap.values()].map(ft => {
-    const r = ft.rep;
-    return `
-    <div style="margin-bottom:14px;border:1px solid #c0cfe0;padding:6px 8px;background:#fafbfc;page-break-inside:avoid">
-      <div style="font-size:9pt;font-weight:bold;color:#1a3a5c;margin-bottom:6px;border-bottom:1px solid #ddd;padding-bottom:3px">
-        نوع ${ft.key} — ${ft.B}×${ft.L}×${ft.t} mm &nbsp;|&nbsp; أعمدة: ${ft.ids.join(', ')}
-        &nbsp;|&nbsp; t<sub>min,ACI</sub> = ${ft.t_min_aci} mm
-      </div>
-      <table style="border-collapse:collapse;width:100%">
-        <tr>
-          <td style="vertical-align:top;padding:0 6px 0 0;white-space:nowrap;border:none;background:transparent">
-            <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">مسقط أفقي (Plan View)</div>
-            ${buildTypePlanSVG(r)}
-          </td>
-          <td style="vertical-align:top;padding:0 6px;white-space:nowrap;border:none;background:transparent">
-            <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">قطاع أ—أ عبر B (Section A-A)</div>
-            ${buildSectionASVG(r, mat)}
-          </td>
-          <td style="vertical-align:top;padding:0;white-space:nowrap;border:none;background:transparent">
-            <div style="font-size:7.5pt;color:#555;text-align:center;margin-bottom:2px">قطاع ب—ب عبر L (Section B-B)</div>
-            ${buildSectionBSVG(r, mat)}
-          </td>
-        </tr>
-      </table>
-    </div>`;
-  }).join('');
+  // ── Per-type detail SVGs — one unified SVG per type (no HTML table/flex) ──
+  const perTypeHTML = [...typeMap.values()].map(ft =>
+    `<div style="margin-bottom:10px;page-break-inside:avoid">
+      ${buildTypeDetailSVG(ft.rep, mat, ft.key, ft.ids, ft.t_min_aci)}
+    </div>`
+  ).join('');
 
   // ── Schedule table rows ───────────────────────────────────────────────────
   const typeRows = [...typeMap.values()].map(ft => `
