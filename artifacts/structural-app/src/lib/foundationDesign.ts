@@ -582,161 +582,229 @@ export function generateFoundationDrawingHTML(
     colToType.set(r.colId, ft.key);
   }
 
-  // ── Plan geometry ────────────────────────────────────────────────────────────
-  const xs = results.map(r => r.x);
-  const ys = results.map(r => r.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  // ── Per-type sheet builder (one drawing plate per foundation type) ───────
+  const buildPlateForType = (ft: FType, plateIndex: number, totalPlates: number): string => {
+    const typeResults = results.filter(r => colToType.get(r.colId) === ft.key);
+    if (typeResults.length === 0) return '';
 
-  // Padding around the building footprint (in metres)
-  const PAD = Math.max(2, Math.max((maxX - minX), (maxY - minY)) * 0.15);
-  const worldW = (maxX - minX) + 2 * PAD;  // metres
-  const worldH = (maxY - minY) + 2 * PAD;
+    // Plan geometry — based ONLY on this type's footings
+    const xs = typeResults.map(r => r.x);
+    const ys = typeResults.map(r => r.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const spanX = Math.max(maxX - minX, 0.001);
+    const spanY = Math.max(maxY - minY, 0.001);
+    const PAD = Math.max(2, Math.max(spanX, spanY) * 0.2);
+    const worldW = spanX + 2 * PAD;
+    const worldH = spanY + 2 * PAD;
+    const PLAN_W = 560;
+    const PLAN_H = Math.max(280, Math.round(PLAN_W * (worldH / Math.max(worldW, 0.1))));
+    const scale = PLAN_W / worldW;
+    const px = (mx: number) => ((mx - minX + PAD) * scale);
+    const py = (my: number) => (PLAN_H - (my - minY + PAD) * scale);
+    const mm2px = (mm: number) => (mm / 1000) * scale;
 
-  // SVG canvas for the plan (px)
-  const PLAN_W = 560;
-  const PLAN_H = Math.max(300, Math.round(PLAN_W * (worldH / Math.max(worldW, 0.1))));
-  const scale = PLAN_W / worldW; // px / m
+    const markers = `
+    <defs>
+      <marker id="arrP_${ft.key}" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+        <path d="M0,0 L6,2 L0,4 Z" fill="#c00"/>
+      </marker>
+      <marker id="arrlP_${ft.key}" markerWidth="6" markerHeight="4" refX="1" refY="2" orient="auto-start-reverse">
+        <path d="M6,0 L0,2 L6,4 Z" fill="#c00"/>
+      </marker>
+      <pattern id="hatch_${ft.key}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#b0b8c8" stroke-width="0.8"/>
+      </pattern>
+    </defs>`;
 
-  function px(mx: number) { return ((mx - minX + PAD) * scale); }
-  function py(my: number) { return (PLAN_H - (my - minY + PAD) * scale); }
-  function mm2px(mm: number) { return (mm / 1000) * scale; }
-
-  // ── SVG markers for plan ───────────────────────────────────────────────────
-  const markers = `
-  <defs>
-    <marker id="arrP" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-      <path d="M0,0 L6,2 L0,4 Z" fill="#c00"/>
-    </marker>
-    <marker id="arrlP" markerWidth="6" markerHeight="4" refX="1" refY="2" orient="auto-start-reverse">
-      <path d="M6,0 L0,2 L6,4 Z" fill="#c00"/>
-    </marker>
-    <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-      <line x1="0" y1="0" x2="0" y2="6" stroke="#b0b8c8" stroke-width="0.8"/>
-    </pattern>
-  </defs>`;
-
-  // ── Foundation plan SVG ───────────────────────────────────────────────────
-  let planElems = '';
-  let dimLines = '';
-  let colLabels = '';
-
-  // Grid lines (chain-dotted) across full plan
-  const uniqueXs = [...new Set(results.map(r => r.x))].sort((a, b) => a - b);
-  const uniqueYs = [...new Set(results.map(r => r.y))].sort((a, b) => a - b);
-  for (const mx of uniqueXs) {
-    const svgX = px(mx);
-    planElems += `<line x1="${svgX.toFixed(1)}" y1="0" x2="${svgX.toFixed(1)}" y2="${PLAN_H}" stroke="#aac" stroke-width="0.6" stroke-dasharray="6,3,2,3"/>`;
-  }
-  for (const my of uniqueYs) {
-    const svgY = py(my);
-    planElems += `<line x1="0" y1="${svgY.toFixed(1)}" x2="${PLAN_W}" y2="${svgY.toFixed(1)}" stroke="#aac" stroke-width="0.6" stroke-dasharray="6,3,2,3"/>`;
-  }
-
-  // Draw footings and columns
-  for (const r of results) {
-    const cx = px(r.x);
-    const cy = py(r.y);
-    const bpx = mm2px(r.B);
-    const lpx = mm2px(r.L);
-    const colBpx = Math.max(5, mm2px(r.B / 5));  // approximate column size in plan (relative to footing)
-    // Use actual column dimension scaled to plan
-    const colBp = mm2px(Math.min(r.B * 0.3, 400));
-    const colHp = mm2px(Math.min(r.L * 0.3, 400));
-    const ftype = colToType.get(r.colId) ?? '';
-
-    // Footing outline (dashed)
-    planElems += `<rect x="${(cx - bpx / 2).toFixed(1)}" y="${(cy - lpx / 2).toFixed(1)}" width="${bpx.toFixed(1)}" height="${lpx.toFixed(1)}"
-      fill="url(#hatch)" fill-opacity="0.4" stroke="#1a3a5c" stroke-width="1.2" stroke-dasharray="5,2.5" rx="1"/>`;
-    // Column solid
-    planElems += `<rect x="${(cx - colBp / 2).toFixed(1)}" y="${(cy - colHp / 2).toFixed(1)}" width="${colBp.toFixed(1)}" height="${colHp.toFixed(1)}"
-      fill="#1a3a5c" fill-opacity="0.8" stroke="#1a3a5c" stroke-width="1"/>`;
-    // Type tag
-    colLabels += `<text x="${cx.toFixed(1)}" y="${(cy - lpx / 2 - 5).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#1a3a5c">${ftype}</text>`;
-    // Column ID
-    colLabels += `<text x="${cx.toFixed(1)}" y="${(cy + 4).toFixed(1)}" text-anchor="middle" font-size="7.5" fill="#fff" font-weight="bold">${r.colId}</text>`;
-    // Dimensions below footing
-    colLabels += `<text x="${cx.toFixed(1)}" y="${(cy + lpx / 2 + 10).toFixed(1)}" text-anchor="middle" font-size="7" fill="#880000">${r.B}×${r.L}</text>`;
-  }
-
-  // Dimension strings along bottom (X-axis spacings) and left (Y-axis spacings)
-  if (uniqueXs.length > 1) {
-    const dimY = PLAN_H - 5;
-    const lineY = PLAN_H + 12;
-    for (let i = 0; i < uniqueXs.length - 1; i++) {
-      const x1 = px(uniqueXs[i]);
-      const x2 = px(uniqueXs[i + 1]);
-      const dist = ((uniqueXs[i + 1] - uniqueXs[i]) * 1000).toFixed(0) + ' mm';
-      const mid = (x1 + x2) / 2;
-      dimLines += `<line x1="${x1.toFixed(1)}" y1="${dimY}" x2="${x2.toFixed(1)}" y2="${dimY}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrlP)" marker-end="url(#arrP)"/>`;
-      dimLines += `<text x="${mid.toFixed(1)}" y="${(dimY - 3).toFixed(1)}" text-anchor="middle" font-size="7" fill="#c00">${dist}</text>`;
+    let planElems = '';
+    let dimLines = '';
+    let colLabels = '';
+    const uXs = [...new Set(typeResults.map(r => r.x))].sort((a, b) => a - b);
+    const uYs = [...new Set(typeResults.map(r => r.y))].sort((a, b) => a - b);
+    for (const mx of uXs) {
+      planElems += `<line x1="${px(mx).toFixed(1)}" y1="0" x2="${px(mx).toFixed(1)}" y2="${PLAN_H}" stroke="#aac" stroke-width="0.6" stroke-dasharray="6,3,2,3"/>`;
     }
-  }
-  if (uniqueYs.length > 1) {
-    const dimX = PLAN_W - 5;
-    for (let i = 0; i < uniqueYs.length - 1; i++) {
-      const y1 = py(uniqueYs[i]);
-      const y2 = py(uniqueYs[i + 1]);
-      const dist = ((uniqueYs[i + 1] - uniqueYs[i]) * 1000).toFixed(0) + ' mm';
-      const mid = (y1 + y2) / 2;
-      dimLines += `<line x1="${dimX}" y1="${y2.toFixed(1)}" x2="${dimX}" y2="${y1.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrlP)" marker-end="url(#arrP)"/>`;
-      dimLines += `<text x="${(dimX - 3).toFixed(1)}" y="${mid.toFixed(1)}" text-anchor="end" font-size="7" fill="#c00">${dist}</text>`;
+    for (const my of uYs) {
+      planElems += `<line x1="0" y1="${py(my).toFixed(1)}" x2="${PLAN_W}" y2="${py(my).toFixed(1)}" stroke="#aac" stroke-width="0.6" stroke-dasharray="6,3,2,3"/>`;
     }
-  }
 
-  // Scale bar
-  const scaleBarM = results.length > 1 ? Math.round((maxX - minX) / 5) || 1 : 1;
-  const scaleBarPx = scaleBarM * scale;
-  const sbX = 10;
-  const sbY = PLAN_H - 16;
-  const scaleNote = `مقياس الرسم: 1 : ${Math.round(1000 / scale)}`;
-  planElems += `<rect x="${sbX}" y="${sbY}" width="${scaleBarPx.toFixed(1)}" height="4" fill="#1a3a5c" stroke="#1a3a5c" stroke-width="0.5"/>
-    <text x="${sbX}" y="${sbY + 12}" font-size="7" fill="#333">0</text>
-    <text x="${(sbX + scaleBarPx).toFixed(1)}" y="${sbY + 12}" font-size="7" fill="#333">${scaleBarM} m</text>
-    <text x="${sbX}" y="${sbY - 3}" font-size="7" fill="#555">${scaleNote}</text>`;
+    for (const r of typeResults) {
+      const cx = px(r.x);
+      const cy = py(r.y);
+      const bpx = mm2px(r.B);
+      const lpx = mm2px(r.L);
+      const colBp = mm2px(Math.min(r.B * 0.3, 400));
+      const colHp = mm2px(Math.min(r.L * 0.3, 400));
+      planElems += `<rect x="${(cx - bpx / 2).toFixed(1)}" y="${(cy - lpx / 2).toFixed(1)}" width="${bpx.toFixed(1)}" height="${lpx.toFixed(1)}"
+        fill="url(#hatch_${ft.key})" fill-opacity="0.4" stroke="#1a3a5c" stroke-width="1.2" stroke-dasharray="5,2.5" rx="1"/>`;
+      planElems += `<rect x="${(cx - colBp / 2).toFixed(1)}" y="${(cy - colHp / 2).toFixed(1)}" width="${colBp.toFixed(1)}" height="${colHp.toFixed(1)}"
+        fill="#1a3a5c" fill-opacity="0.85" stroke="#1a3a5c" stroke-width="1"/>`;
+      colLabels += `<text x="${cx.toFixed(1)}" y="${(cy - lpx / 2 - 5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a3a5c">${ft.key}</text>`;
+      colLabels += `<text x="${cx.toFixed(1)}" y="${(cy + 4).toFixed(1)}" text-anchor="middle" font-size="7.5" fill="#fff" font-weight="bold">${r.colId}</text>`;
+      colLabels += `<text x="${cx.toFixed(1)}" y="${(cy + lpx / 2 + 10).toFixed(1)}" text-anchor="middle" font-size="7" fill="#880000">${r.B}×${r.L}</text>`;
+    }
 
-  // North arrow (top right corner)
-  const naX = PLAN_W - 22;
-  const naY = 22;
-  planElems += `<polygon points="${naX},${naY - 12} ${naX - 6},${naY + 8} ${naX},${naY + 3} ${naX + 6},${naY + 8}" fill="#1a3a5c" stroke="#1a3a5c" stroke-width="0.5"/>
-    <text x="${naX}" y="${naY + 20}" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a3a5c">N</text>`;
+    if (uXs.length > 1) {
+      const dimY = PLAN_H - 5;
+      for (let i = 0; i < uXs.length - 1; i++) {
+        const x1 = px(uXs[i]);
+        const x2 = px(uXs[i + 1]);
+        const dist = ((uXs[i + 1] - uXs[i]) * 1000).toFixed(0) + ' mm';
+        const mid = (x1 + x2) / 2;
+        dimLines += `<line x1="${x1.toFixed(1)}" y1="${dimY}" x2="${x2.toFixed(1)}" y2="${dimY}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrlP_${ft.key})" marker-end="url(#arrP_${ft.key})"/>`;
+        dimLines += `<text x="${mid.toFixed(1)}" y="${(dimY - 3).toFixed(1)}" text-anchor="middle" font-size="7" fill="#c00">${dist}</text>`;
+      }
+    }
+    if (uYs.length > 1) {
+      const dimX = PLAN_W - 5;
+      for (let i = 0; i < uYs.length - 1; i++) {
+        const y1 = py(uYs[i]);
+        const y2 = py(uYs[i + 1]);
+        const dist = ((uYs[i + 1] - uYs[i]) * 1000).toFixed(0) + ' mm';
+        const mid = (y1 + y2) / 2;
+        dimLines += `<line x1="${dimX}" y1="${y2.toFixed(1)}" x2="${dimX}" y2="${y1.toFixed(1)}" stroke="#c00" stroke-width="0.7" marker-start="url(#arrlP_${ft.key})" marker-end="url(#arrP_${ft.key})"/>`;
+        dimLines += `<text x="${(dimX - 3).toFixed(1)}" y="${mid.toFixed(1)}" text-anchor="end" font-size="7" fill="#c00">${dist}</text>`;
+      }
+    }
 
-  // ── Per-type detail SVGs — one unified SVG per type (no HTML table/flex) ──
-  const perTypeHTML = [...typeMap.values()].map(ft =>
-    `<div style="margin-bottom:10px;page-break-inside:avoid">
-      ${buildTypeDetailSVG(ft.rep, mat, ft.key, ft.ids, ft.t_min_aci)}
-    </div>`
-  ).join('');
+    // Per-type schedule + design rows for THIS type only
+    const typeSchedRow = `
+      <tr>
+        <td class="ftype"><b>${ft.key}</b></td>
+        <td>${ft.B}</td>
+        <td>${ft.L}</td>
+        <td>${ft.t}</td>
+        <td>${ft.t_min_aci}</td>
+        <td class="rebar">${ft.bars_x}Ø${ft.dia_x}@${ft.spacing_x}</td>
+        <td class="rebar">${ft.bars_y}Ø${ft.dia_y}@${ft.spacing_y}</td>
+        <td>${ft.ids.length} عمود</td>
+      </tr>`;
+    const typeDetailRows = typeResults.map(r => `
+      <tr class="${r.adequate ? '' : 'fail'}">
+        <td class="ftype">${r.colId}</td>
+        <td>${r.P_service.toFixed(0)}</td>
+        <td>${r.B}×${r.L}</td>
+        <td>${r.t}</td>
+        <td>${r.d}</td>
+        <td>${r.q_actual.toFixed(0)}</td>
+        <td class="${r.bearing_ok ? 'ok' : 'fail'}">${r.bearing_ok ? '✓' : '✗'}</td>
+        <td class="rebar">${r.bars_x}Ø${r.dia_x}@${r.spacing_x}</td>
+        <td class="rebar">${r.bars_y}Ø${r.dia_y}@${r.spacing_y}</td>
+        <td class="${r.wide_shear_ok ? 'ok' : 'fail'}">${r.wide_shear_ok ? '✓' : '✗'}</td>
+        <td class="${r.punch_shear_ok ? 'ok' : 'fail'}">${r.punch_shear_ok ? '✓' : '✗'}</td>
+      </tr>`).join('');
 
-  // ── Schedule table rows ───────────────────────────────────────────────────
-  const typeRows = [...typeMap.values()].map(ft => `
-    <tr>
-      <td class="ftype"><b>${ft.key}</b></td>
-      <td>${ft.B}</td>
-      <td>${ft.L}</td>
-      <td>${ft.t}</td>
-      <td>${ft.t_min_aci}</td>
-      <td class="rebar">${ft.bars_x}Ø${ft.dia_x}@${ft.spacing_x}</td>
-      <td class="rebar">${ft.bars_y}Ø${ft.dia_y}@${ft.spacing_y}</td>
-      <td>${ft.ids.join(', ')}</td>
-    </tr>`).join('');
+    const drawingNo = `${titleBlock.drawingNumber || 'F'}-${String(plateIndex).padStart(2, '0')}`;
+    const pageBreak = plateIndex < totalPlates ? 'page-break-after: always;' : '';
 
-  const detailRows = results.map(r => `
-    <tr class="${r.adequate ? '' : 'fail'}">
-      <td class="ftype">${colToType.get(r.colId) ?? ''} — ${r.colId}</td>
-      <td>${r.P_service.toFixed(0)}</td>
-      <td>${r.B}×${r.L}</td>
-      <td>${r.t}</td>
-      <td>${r.d}</td>
-      <td>${r.q_actual.toFixed(0)}</td>
-      <td class="${r.bearing_ok ? 'ok' : 'fail'}">${r.bearing_ok ? '✓' : '✗'}</td>
-      <td class="rebar">${r.bars_x}Ø${r.dia_x}@${r.spacing_x}</td>
-      <td class="rebar">${r.bars_y}Ø${r.dia_y}@${r.spacing_y}</td>
-      <td class="${r.wide_shear_ok ? 'ok' : 'fail'}">${r.wide_shear_ok ? '✓' : '✗'}</td>
-      <td class="${r.punch_shear_ok ? 'ok' : 'fail'}">${r.punch_shear_ok ? '✓' : '✗'}</td>
-    </tr>`).join('');
+    return `
+<section class="plate" style="${pageBreak}">
+
+  <!-- Title block (per-plate) -->
+  <div class="title-block">
+    <div class="tb-main">
+      <h1>لوحة تنفيذية — أساسات نوع ${ft.key} (${ft.B}×${ft.L}×${ft.t} mm)</h1>
+      <div class="sub">طريقة الإجهادات العاملة (WSM / ASD) · ACI 318 · UBC 1997</div>
+      <div class="sub" style="margin-top:2px">المشروع: <b>${proj}</b> &nbsp;|&nbsp; مكتب الاستشارات: <b>${titleBlock.firmName || '—'}</b></div>
+      <div class="sub" style="margin-top:2px">عدد الأعمدة المرتبطة بهذا النوع: <b>${ft.ids.length}</b> &nbsp;|&nbsp; الورقة <b>${plateIndex} / ${totalPlates}</b></div>
+    </div>
+    <div class="tb-side">
+      <div class="tb-cell"><b>صمّمه:</b><span>${titleBlock.designedBy || '—'}</span></div>
+      <div class="tb-cell"><b>راجعه:</b><span>${titleBlock.checkedBy || '—'}</span></div>
+      <div class="tb-cell"><b>التاريخ:</b><span>${today}</span></div>
+      <div class="tb-cell"><b>رقم اللوحة:</b><span>${drawingNo}</span></div>
+    </div>
+  </div>
+
+  <!-- Material bar -->
+  <div class="mat-bar">
+    <span><b>f'c</b> = ${mat.fc} MPa</span>
+    <span><b>fy</b> = ${mat.fy} MPa</span>
+    <span><b>qa</b> = ${mat.qa} kN/m²</span>
+    <span><b>fc,allow</b> = ${(0.45 * mat.fc).toFixed(1)} MPa</span>
+    <span><b>fs,allow</b> = ${Math.min(0.5 * mat.fy, 207).toFixed(0)} MPa</span>
+    <span><b>Df</b> = ${mat.Df} m</span>
+    <span><b>Cover</b> = ${mat.cover} mm</span>
+  </div>
+
+  <!-- Plan: only this type's footings -->
+  <div class="sec-hdr">مسقط الأساسات — النوع ${ft.key} فقط</div>
+  <div class="draw-box" style="margin-bottom:8px">
+    <svg class="plan-svg" viewBox="0 0 ${PLAN_W} ${PLAN_H}" xmlns="http://www.w3.org/2000/svg">
+      ${markers}
+      <rect width="${PLAN_W}" height="${PLAN_H}" fill="#f8f9fb"/>
+      ${planElems}
+      ${dimLines}
+      ${colLabels}
+    </svg>
+    <div style="font-size:7pt;color:#555;margin-top:3px;text-align:center">
+      ▬ ▬ حدود الأساس &nbsp;|&nbsp; ■ العمود &nbsp;|&nbsp; ${ft.key} نوع القاعدة &nbsp;|&nbsp; جميع الأبعاد بالمليمتر
+    </div>
+  </div>
+
+  <!-- Detail drawing for this type -->
+  <div class="sec-hdr">تفاصيل النوع ${ft.key} — Plan + Section A-A + Section B-B</div>
+  <div style="margin-bottom:10px;page-break-inside:avoid">
+    ${buildTypeDetailSVG(ft.rep, mat, ft.key, ft.ids, ft.t_min_aci)}
+  </div>
+
+  <!-- Schedule (this type only) -->
+  <div class="sec-hdr">جدول النوع ${ft.key} — Footing Type Schedule</div>
+  <table>
+    <thead>
+      <tr>
+        <th>النوع</th>
+        <th>B (mm)</th>
+        <th>L (mm)</th>
+        <th>t مختار (mm)</th>
+        <th>t<sub>min,ACI</sub> (mm)</th>
+        <th>تسليح اتجاه B</th>
+        <th>تسليح اتجاه L</th>
+        <th>عدد القواعد</th>
+      </tr>
+    </thead>
+    <tbody>${typeSchedRow}</tbody>
+  </table>
+
+  <!-- Per-column results in this type -->
+  <div class="sec-hdr">نتائج التصميم لكل عمود — النوع ${ft.key}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>العمود</th>
+        <th>P (kN)</th>
+        <th>B×L (mm)</th>
+        <th>t (mm)</th>
+        <th>d (mm)</th>
+        <th>q فعلي<br/>kN/m²</th>
+        <th>ضغط التربة</th>
+        <th>تسليح B</th>
+        <th>تسليح L</th>
+        <th>قص عريض</th>
+        <th>قص ثقبي</th>
+      </tr>
+    </thead>
+    <tbody>${typeDetailRows}</tbody>
+  </table>
+
+  <!-- Notes -->
+  <div class="sec-hdr">ملاحظات تنفيذية — Construction Notes</div>
+  <ol class="notes">
+    <li>تُصَب طبقة نظافة سُمكها <b>50 mm</b> من الخرسانة العادية قبل وضع حديد التسليح.</li>
+    <li>الغطاء الخرساني لأساسات الأرض ≥ <b>${mat.cover} mm</b> (ACI 318 §20.6.1.3).</li>
+    <li>جميع الحديد ${mat.fy === 420 ? 'Grade 60 (fy = 420 MPa)' : mat.fy === 280 ? 'Grade 40 (fy = 280 MPa)' : `fy = ${mat.fy} MPa`}.</li>
+    <li>طول التماسك الأساسي: ld ≥ 0.02 × fy/√f'c × db (ACI 318 §25.5).</li>
+    <li>منسوب التأسيس Df = ${mat.Df} m من منسوب الطبيعي.</li>
+  </ol>
+
+</section>`;
+  };
+
+  const types = [...typeMap.values()];
+  const platesHTML = types.map((ft, i) => buildPlateForType(ft, i + 1, types.length)).join('');
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -746,7 +814,7 @@ export function generateFoundationDrawingHTML(
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Arial',sans-serif;font-size:9pt;color:#111;background:#fff;padding:8mm}
-  /* ─── Title block ─── */
+  section.plate{padding-bottom:6mm}
   .title-block{display:grid;grid-template-columns:repeat(6,1fr);border:2px solid #1a3a5c;margin-bottom:8px}
   .tb-main{grid-column:1/5;padding:4px 10px;border-left:1px solid #ccc}
   .tb-main h1{font-size:13pt;color:#1a3a5c;border-bottom:1px solid #ccc;padding-bottom:3px;margin-bottom:3px}
@@ -754,14 +822,9 @@ export function generateFoundationDrawingHTML(
   .tb-side{grid-column:5/7;display:grid;grid-template-rows:repeat(4,1fr);border-right:1px solid #aaa}
   .tb-cell{padding:3px 8px;border-bottom:1px solid #ddd;font-size:8pt;display:flex;justify-content:space-between}
   .tb-cell b{color:#1a3a5c}
-  /* ─── Section headers ─── */
   .sec-hdr{background:#1a3a5c;color:#fff;font-size:9pt;font-weight:bold;padding:3px 8px;margin:8px 0 4px}
-  /* ─── Drawing layout ─── */
-  .draw-row{display:grid;grid-template-columns:55fr 45fr;gap:8px;margin-bottom:8px}
   .draw-box{border:1px solid #ccc;padding:4px;background:#fafbfc}
-  .draw-box h3{font-size:8pt;color:#1a3a5c;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid #ddd}
   svg.plan-svg{display:block;width:100%}
-  /* ─── Tables ─── */
   table{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:8px}
   th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:center;border:1px solid #1a3a5c}
   td{border:1px solid #ccc;padding:3px 5px;text-align:center}
@@ -770,115 +833,16 @@ export function generateFoundationDrawingHTML(
   .rebar{font-family:monospace;color:#880000;font-weight:bold}
   .ok{color:green}
   .fail{color:red;background:#fff0f0 !important}
-  /* ─── Notes ─── */
-  .notes{font-size:8pt;border:1px solid #ccc;padding:6px 10px;background:#fafbfc;counter-reset:note}
+  .notes{font-size:8pt;border:1px solid #ccc;padding:6px 10px;background:#fafbfc}
   .notes li{margin:2px 0;margin-right:16px}
   .mat-bar{display:flex;flex-wrap:wrap;gap:12px;background:#eef3fa;padding:5px 10px;font-size:8pt;border:1px solid #c0cfe0;margin-bottom:6px}
   .mat-bar span{white-space:nowrap}
   .mat-bar b{color:#1a3a5c}
-  @media print{body{padding:4mm} .no-print{display:none}}
+  @media print{body{padding:4mm} .no-print{display:none} section.plate{padding-bottom:0}}
 </style>
 </head>
 <body>
-
-<!-- ══════════════ TITLE BLOCK ══════════════ -->
-<div class="title-block">
-  <div class="tb-main">
-    <h1>لوحة تنفيذية — تصميم الأساسات المنفردة</h1>
-    <div class="sub">طريقة الإجهادات العاملة (WSM / ASD) · ACI 318 · UBC 1997</div>
-    <div class="sub" style="margin-top:2px">المشروع: <b>${proj}</b> &nbsp;|&nbsp; مكتب الاستشارات: <b>${titleBlock.firmName || '—'}</b></div>
-  </div>
-  <div class="tb-side">
-    <div class="tb-cell"><b>صمّمه:</b><span>${titleBlock.designedBy || '—'}</span></div>
-    <div class="tb-cell"><b>راجعه:</b><span>${titleBlock.checkedBy || '—'}</span></div>
-    <div class="tb-cell"><b>التاريخ:</b><span>${today}</span></div>
-    <div class="tb-cell"><b>رقم اللوحة:</b><span>${titleBlock.drawingNumber || 'F-01'}</span></div>
-  </div>
-</div>
-
-<!-- ══════════════ MATERIAL BAR ══════════════ -->
-<div class="mat-bar">
-  <span><b>f'c</b> = ${mat.fc} MPa</span>
-  <span><b>fy</b> = ${mat.fy} MPa</span>
-  <span><b>qa</b> = ${mat.qa} kN/m²</span>
-  <span><b>fc,allow</b> = ${(0.45 * mat.fc).toFixed(1)} MPa</span>
-  <span><b>fs,allow</b> = ${Math.min(0.5 * mat.fy, 207).toFixed(0)} MPa</span>
-  <span><b>Df</b> = ${mat.Df} m</span>
-  <span><b>Cover</b> = ${mat.cover} mm</span>
-  <span><b>n</b> = ${Math.max(6, Math.round(200000 / (4700 * Math.sqrt(mat.fc))))}</span>
-</div>
-
-<!-- ══════════════ GLOBAL FOUNDATION PLAN ══════════════ -->
-<div class="sec-hdr">مسقط الأساسات — Foundation Plan</div>
-<div class="draw-box" style="margin-bottom:8px">
-  <svg class="plan-svg" viewBox="0 0 ${PLAN_W} ${PLAN_H}" xmlns="http://www.w3.org/2000/svg">
-    ${markers}
-    <rect width="${PLAN_W}" height="${PLAN_H}" fill="#f8f9fb"/>
-    ${planElems}
-    ${dimLines}
-    ${colLabels}
-  </svg>
-  <div style="font-size:7pt;color:#555;margin-top:3px;text-align:center">
-    ▬ ▬ حدود الأساس &nbsp;|&nbsp; ■ العمود &nbsp;|&nbsp; F1,F2… نوع القاعدة &nbsp;|&nbsp; جميع الأبعاد بالمليمتر
-  </div>
-</div>
-
-<!-- ══════════════ PER-TYPE DETAIL DRAWINGS ══════════════ -->
-<div class="sec-hdr">تفاصيل الأنواع — Type Detail Drawings (Plan + Section A-A + Section B-B)</div>
-${perTypeHTML}
-
-<!-- ══════════════ FOOTING TYPE SCHEDULE ══════════════ -->
-<div class="sec-hdr">جدول أنواع الأساسات — Footing Schedule</div>
-<table>
-  <thead>
-    <tr>
-      <th>النوع</th>
-      <th>B (mm)<br/><small>⊥ b عمود</small></th>
-      <th>L (mm)<br/><small>⊥ h عمود</small></th>
-      <th>t مختار (mm)</th>
-      <th>t<sub>min,ACI</sub> (mm)</th>
-      <th>تسليح اتجاه B</th>
-      <th>تسليح اتجاه L</th>
-      <th>الأعمدة</th>
-    </tr>
-  </thead>
-  <tbody>${typeRows}</tbody>
-</table>
-
-<!-- ══════════════ DETAIL RESULTS TABLE ══════════════ -->
-<div class="sec-hdr">جدول نتائج تصميم الأساسات — Design Results</div>
-<table>
-  <thead>
-    <tr>
-      <th>النوع — العمود</th>
-      <th>P (kN)</th>
-      <th>B×L (mm)</th>
-      <th>t (mm)</th>
-      <th>d (mm)</th>
-      <th>q فعلي<br/>kN/m²</th>
-      <th>ضغط التربة</th>
-      <th>تسليح B</th>
-      <th>تسليح L</th>
-      <th>قص عريض</th>
-      <th>قص ثقبي</th>
-    </tr>
-  </thead>
-  <tbody>${detailRows}</tbody>
-</table>
-
-<!-- ══════════════ NOTES ══════════════ -->
-<div class="sec-hdr">ملاحظات تنفيذية — Construction Notes</div>
-<ol class="notes">
-  <li>تُصَب طبقة نظافة سُمكها <b>50 mm</b> من الخرسانة العادية (lean concrete) قبل وضع حديد التسليح.</li>
-  <li>الغطاء الخرساني لأساسات الأرض ≥ <b>${mat.cover} mm</b> من وجه الصب السفلي (ACI 318 §20.6.1.3).</li>
-  <li>أبعاد القاعدة (B × L) مُقاربة لأبعاد مقطع العمود بنسبة L/B = h/b، مما يُحقق كفاءة في توزيع الضغط.</li>
-  <li>يُراجع المهندس المشرف التربة ميدانياً للتثبت من قدرة الحمل المفترضة (qa = ${mat.qa} kN/m²).</li>
-  <li>جميع الحديد ${mat.fy === 420 ? 'Grade 60 (fy = 420 MPa)' : mat.fy === 280 ? 'Grade 40 (fy = 280 MPa)' : `fy = ${mat.fy} MPa`} — يُتحقق من شهادات المصنع.</li>
-  <li>طول التماسك الأساسي لحديد الأساسات: ld ≥ 0.02 × fy/√f'c × db (ACI 318 §25.5).</li>
-  <li>تُنفَّذ شبكة التسليح من طبقتين متقاطعتين في الاتجاهين، تسليح اتجاه L (الأطول) هو الطبقة السفلية.</li>
-  <li>منسوب التأسيس Df = ${mat.Df} m من منسوب الطبيعي — يُعدَّل وفق مخطط القطوع الجيوتكنية.</li>
-</ol>
-
+${platesHTML}
 </body>
 </html>`;
 }
