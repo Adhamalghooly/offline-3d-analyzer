@@ -29,6 +29,7 @@ import ModelCanvas from "@/components/ModelCanvas";
 import PropertyPanel from "@/components/PropertyPanel";
 import BuildingView from "@/components/BuildingView";
 import RebarDetailModal from "@/components/RebarDetailModal";
+import ElementMomentChartModal from "@/components/ElementMomentChartModal";
 import ElementPropertiesDialog from "@/components/ElementPropertiesDialog";
 import AnalysisDiagramDialog from "@/components/AnalysisDiagramDialog";
 import {
@@ -1507,6 +1508,12 @@ const Index = () => {
     dispatch({ type: 'OPEN_MODAL', element: { type, id } });
   };
 
+  // View tab: open the bending-moment chart instead of the rebar modal.
+  const [momentChartElement, setMomentChartElement] = React.useState<{ type: 'beam' | 'column' | 'slab'; id: string } | null>(null);
+  const handleViewSelectElement = (type: 'beam' | 'column' | 'slab', id: string) => {
+    setMomentChartElement({ type, id });
+  };
+
   // Helper: get bent-up-adjusted top bars for a beam
   const getBentUpData = (beamId: string) => {
     for (const fr of bentUpResults) {
@@ -2402,7 +2409,7 @@ const Index = () => {
                     frameResults
                   }
                   beamDesigns={beamDesigns} colDesigns={colDesigns}
-                  onSelectElement={handleSelectElement}
+                  onSelectElement={handleViewSelectElement}
                   removedColumnIds={removedColumnIds} bobConnections={bobConnections}
                   showMoments={showViewMoments}
                 />
@@ -4073,6 +4080,28 @@ const Index = () => {
           elementId={selectedElement.id}
           dimensions={modalData.dimensions}
           reinforcement={modalData.reinforcement}
+        />
+      )}
+
+      {/* View tab — bending-moment chart along the element */}
+      {momentChartElement && (
+        <ElementMomentChartModal
+          open={!!momentChartElement}
+          onClose={() => setMomentChartElement(null)}
+          elementType={momentChartElement.type}
+          elementId={momentChartElement.id}
+          beams={beamsWithLoads}
+          columns={columns}
+          slabs={slabs}
+          frameResults={
+            !showViewMoments ? frameResults :
+            viewMomentEngine === '2d' ? frameResults2D :
+            viewMomentEngine === '3d' ? frameResults3DRaw :
+            viewMomentEngine === 'gf' ? frameResultsGF :
+            frameResults
+          }
+          beamDesigns={beamDesigns}
+          colDesigns={colDesigns}
         />
       )}
 
