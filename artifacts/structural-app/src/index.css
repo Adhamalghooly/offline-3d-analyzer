@@ -384,3 +384,29 @@
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
+/* ─── MODEL CANVAS ELEMENTS (fixes invisible beams/columns/nodes/slabs) ──── */
+.element-slab {
+  fill: hsl(var(--slab-fill) / 0.18);
+  stroke: hsl(var(--slab));
+  stroke-linejoin: round;
+  cursor: pointer;
+}
+.element-beam {
+  stroke: hsl(var(--beam));
+  stroke-linecap: round;
+  cursor: pointer;
+  fill: none;
+}
+.element-column {
+  fill: hsl(var(--column));
+  stroke: hsl(var(--column));
+  stroke-width: 0.02;
+  cursor: pointer;
+}
+.element-node {
+  fill: hsl(var(--background));
+  stroke: hsl(var(--foreground));
+  stroke-width: 0.03;
+  cursor: pointer;
+}
