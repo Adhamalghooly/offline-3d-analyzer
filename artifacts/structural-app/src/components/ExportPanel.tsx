@@ -203,7 +203,7 @@ export default function ExportPanel({
           date: titleBlockConfig?.date,
           drawingNumber: titleBlockConfig?.drawingNumber || 'F-01',
         };
-        const html = generateFoundationDrawingHTML(foundationResults, tb, foundationMat);
+        const html = generateFoundationDrawingHTML(foundationResults, tb, foundationMat, sheetSize);
         if (format === 'print') {
           // Open in print window alongside other sheets
           import('@/lib/capacitorDownload').then(({ openHTMLForPrint }) =>
