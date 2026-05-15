@@ -95,19 +95,20 @@ function selectRebar(
   width: number,
   cover: number,
 ): { bars: number; dia: number; spacing: number; As_provided: number } {
+  // Minimum 5 bars (per user requirement) and minimum Ø16 mm
+  const MIN_BARS = 5;
   const DIAMS = [16, 18, 20, 22, 25, 28, 32];
   for (const dia of DIAMS) {
     const ab = Math.PI * dia * dia / 4;
-    const bars = Math.ceil(As_req_total / ab);
-    if (bars < 2) continue;
-    const spacing = (width - 2 * cover - dia) / (bars - 1);
+    const bars = Math.max(MIN_BARS, Math.ceil(As_req_total / ab));
+    const spacing = bars > 1 ? (width - 2 * cover - dia) / (bars - 1) : 0;
     if (spacing >= 75 && spacing <= 400) {
       return { bars, dia, spacing: Math.round(spacing), As_provided: bars * ab };
     }
   }
   const dia = 25;
   const ab = Math.PI * dia * dia / 4;
-  const bars = Math.max(2, Math.ceil(As_req_total / ab));
+  const bars = Math.max(MIN_BARS, Math.ceil(As_req_total / ab));
   const spacing = bars > 1 ? (width - 2 * cover - dia) / (bars - 1) : 100;
   return { bars, dia, spacing: Math.round(Math.max(75, spacing)), As_provided: bars * ab };
 }
@@ -550,6 +551,7 @@ export function generateFoundationDrawingHTML(
     drawingNumber?: string;
   },
   mat: FootingMaterials,
+  paperSize: 'A1' | 'A3' | 'A4' = 'A3',
 ): string {
   if (results.length === 0) return '<html><body>لا توجد نتائج</body></html>';
 
@@ -812,6 +814,7 @@ export function generateFoundationDrawingHTML(
 <meta charset="UTF-8"/>
 <title>لوحة الأساسات — ${proj}</title>
 <style>
+  @page { size: ${paperSize} landscape; margin: 8mm; }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Arial',sans-serif;font-size:9pt;color:#111;background:#fff;padding:8mm}
   section.plate{padding-bottom:6mm}

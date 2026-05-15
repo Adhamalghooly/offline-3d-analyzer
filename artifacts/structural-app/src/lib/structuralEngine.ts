@@ -3148,11 +3148,13 @@ export function calculateBentUpBars(
   isExteriorRight: boolean,
   fy: number
 ): BentUpBarResult {
+  // Skip bent-up bars for short beams (span ≤ 2 m): not effective and not constructible.
+  const isShortSpan = span <= 2.0;
   // ACI §9.7.3.8.2: at least 1/3 of positive moment steel must remain straight to support
   const minStraight = Math.ceil(bottomBars / 3);
   // Bend every other bar - alternate bars
   const maxBentBars = bottomBars - minStraight;
-  const bentBarsCount = Math.max(0, Math.floor(maxBentBars));
+  const bentBarsCount = isShortSpan ? 0 : Math.max(0, Math.floor(maxBentBars));
 
   const aBar = Math.PI * bottomDia * bottomDia / 4;
   const bentBarsArea = bentBarsCount * aBar;
